@@ -23,3 +23,36 @@
 - Тип промпта: master prompt (build).
 - Строка в [`prompts.md`](prompts.md): P1-03.
 - Что проверили и исправили сами: убедилась, что нагрузочные пределы явно помечены как "требует уточнения" там, где в источниках нет данных (целевой RPS, SLA), а не выданы как окончательные значения.
+
+## Формат отчёта
+
+Каждый прогон каждого сценария сохраняется в отдельный JSON-файл `load/results/<scenario_id>_<run_id>.json` (например `load/results/S2_slow_llm_2026-09-11T10-30-00Z.json`). Файл формируется k6 через `handleSummary()` в скрипте сценария: агрегированные метрики берутся из объекта `data.metrics` и записываются в поля ниже; параллельно сохраняется сырой поток точек `k6 run --out json=load/results/<scenario_id>_<run_id>.raw.json` для повторного пересчёта перцентилей. Итоговые файлы коммитятся в репозиторий вместе с `run_id`, чтобы прогоны можно было сравнивать между собой (в первую очередь с базовой линией сценария 1).
+
+Один JSON-файл — один сценарий, одна плоская структура со следующими полями:
+
+| Поле | Тип | Пример значения |
+|---|---|---|
+| `scenario_id` | string | `"S2_slow_llm"` |
+| `run_id` | string (ISO 8601, UTC) | `"2026-09-11T10:30:00Z"` |
+| `git_commit` | string | `"a1b2c3d"` |
+| `mock_llm_delay_s` | number | `15.0` |
+| `vus` | integer | `10` |
+| `duration_s` | integer | `60` |
+| `requests_total` | integer | `412` |
+| `status_counts` | object (код → число) | `{"200": 0, "413": 0, "422": 0, "5xx": 0}` |
+| `rate_5xx` | number (0..1) | `0.0` |
+| `latency_p50_ms` | number | `9980` |
+| `latency_p95_ms` | number | `10120` |
+| `latency_max_ms` | number | `10240` |
+| `mock_llm_calls` | integer | `412` |
+| `log_records_total` | integer | `412` |
+| `log_leak_marker_found` | boolean | `false` |
+| `thresholds_passed` | boolean | `false` |
+| `notes` | string | `"p95 превысил 10 с на 120 мс — накладные требуют уточнения"` |
+
+Пояснения к полям:
+
+- `status_counts` содержит ключи для каждого ожидаемого сценарием кода (200/413/422) и агрегированный `5xx`; сумма значений должна равняться `requests_total`.
+- `mock_llm_calls` и `log_records_total` берутся не из k6, а из счётчика mock LLM и лога OBS-1 после прогона и дописываются в тот же файл скриптом сбора; для сценария 3 ожидается `mock_llm_calls = 0`, для сценария 5 — `log_records_total = requests_total`.
+- `log_leak_marker_found` — результат поиска `MARKER_XYZ` в логе (сценарий 5) или секретов в `mock_llm.last_prompt` (сценарий 6); `true` означает провал сценария независимо от остальных метрик.
+- `thresholds_passed` — итог k6 `thresholds` по колонке «Допустимый предел»; поле `notes` заполняется вручную и обязательно при `thresholds_passed = false`.
