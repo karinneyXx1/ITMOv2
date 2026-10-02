@@ -1,88 +1,124 @@
 #!/usr/bin/env python3
 """
-Браузерная проверка Race Mini:
-1. Открыть index.html
-2. Нажать стрелку вверх несколько раз → скорость растёт до MAX_SPEED
-3. Вызвать testInvalidCommand() → проверить отклонение невалидной команды
+Браузерная проверка Metro Rush (Playwright, headless Chromium).
+
+Что проверяется:
+1. Страница открывается без ошибок в консоли, canvas занимает весь экран.
+2. Стартовый экран виден, Enter запускает заезд.
+3. Машина разгоняется сама, E переключает передачу вверх, Q — вниз.
+4. Стрелки меняют полосу, пробел запускает прыжок.
+5. Невалидная команда отклоняется и не меняет состояние.
+6. Пауза по Esc останавливает мир.
+
+Запуск:  venv/bin/python test_browser.py
+Скриншоты сохраняются в папку из SCREENSHOT_DIR (по умолчанию — системная временная папка).
 """
 
-from playwright.sync_api import sync_playwright
 import os
+import sys
+import tempfile
 import time
 
-# Получаем абсолютный путь к index.html
-current_dir = os.path.dirname(os.path.abspath(__file__))
-html_path = os.path.join(current_dir, 'index.html')
-file_url = f'file://{html_path}'
+from playwright.sync_api import sync_playwright
 
-print(f'Opening: {file_url}')
+HERE = os.path.dirname(os.path.abspath(__file__))
+FILE_URL = f"file://{os.path.join(HERE, 'index.html')}"
+SHOTS = os.environ.get("SCREENSHOT_DIR", tempfile.gettempdir())
+
+failures = []
+
+
+def check(condition, message):
+    print(("  ✅ " if condition else "  ❌ ") + message)
+    if not condition:
+        failures.append(message)
+
+
+def world(page):
+    return page.evaluate("() => window.__metro.world")
+
 
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True)
-    page = browser.new_page()
-    
-    # Открываем index.html
-    page.goto(file_url)
-    page.wait_for_load_state('networkidle')
-    
-    # Скриншот начального состояния
-    page.screenshot(path='/tmp/race_mini_initial.png', full_page=True)
-    print('✓ Начальный скриншот: /tmp/race_mini_initial.png')
-    
-    # Проверяем начальную скорость
-    initial_speed = page.locator('#speedDisplay').inner_text()
-    print(f'✓ Начальная скорость: {initial_speed}')
-    
-    # Получаем MAX_SPEED из контекста страницы
-    max_speed = page.evaluate('MAX_SPEED')
-    print(f'✓ MAX_SPEED из game.js: {max_speed}')
-    
-    # Удерживаем стрелку вверх для ускорения (keydown -> wait -> keyup)
-    print('\nУдерживаем стрелку вверх для ускорения до MAX_SPEED...')
-    page.keyboard.down('ArrowUp')
-    time.sleep(1.5)  # достаточно времени чтобы набрать MAX_SPEED (10 / 0.5 = 20 кадров = ~0.33 сек при 60fps)
-    page.keyboard.up('ArrowUp')
-    
-    # Ждём стабилизации состояния
-    time.sleep(0.3)
-    
-    # Проверяем финальную скорость
-    final_speed = page.locator('#speedDisplay').inner_text()
-    final_speed_float = float(final_speed)
-    print(f'✓ Финальная скорость: {final_speed}')
-    
-    # Проверка: скорость должна быть равна MAX_SPEED
-    if abs(final_speed_float - max_speed) < 0.01:
-        print(f'✅ Скорость достигла MAX_SPEED ({max_speed}) и остановилась!')
-    else:
-        print(f'❌ ОШИБКА: Скорость {final_speed_float}, ожидалась {max_speed}')
-    
-    # Скриншот после ускорения
-    page.screenshot(path='/tmp/race_mini_accelerated.png', full_page=True)
-    print('✓ Скриншот после ускорения: /tmp/race_mini_accelerated.png')
-    
-    # Тест невалидной команды через консоль
-    print('\nТестируем невалидную команду через testInvalidCommand()...')
-    result = page.evaluate('window.testInvalidCommand()')
-    
-    # Проверяем консольные логи на странице
-    console_html = page.locator('#console').inner_html()
-    
-    if 'Validation correctly rejected' in console_html:
-        print('✅ Невалидная команда корректно отклонена валидацией!')
-    else:
-        print('❌ ОШИБКА: Невалидная команда не была отклонена')
-    
-    # Финальный скриншот с логами
-    page.screenshot(path='/tmp/race_mini_final.png', full_page=True)
-    print('✓ Финальный скриншот: /tmp/race_mini_final.png')
-    
-    # Получаем все логи из консоли страницы
-    console_logs = page.locator('#console div').all_inner_texts()
-    print('\n=== Console logs ===')
-    for log in console_logs:
-        print(f'  {log}')
-    
+    page = browser.new_page(viewport={"width": 1440, "height": 900})
+    errors = []
+    page.on("pageerror", lambda err: errors.append(str(err)))
+    page.on("console", lambda msg: errors.append(msg.text) if msg.type == "error" else None)
+
+    print(f"Открываю {FILE_URL}")
+    page.goto(FILE_URL)
+    page.wait_for_load_state("networkidle")
+    page.wait_for_timeout(500)
+
+    print("\n1. Загрузка и полноэкранный canvas")
+    size = page.evaluate(
+        "() => { const c = document.getElementById('game'); return [c.clientWidth, c.clientHeight]; }"
+    )
+    check(size == [1440, 900], f"canvas на весь экран: {size}")
+    page.screenshot(path=os.path.join(SHOTS, "metro_menu.png"))
+
+    print("\n2. Стартовый экран и запуск")
+    check(page.is_visible("#menu"), "стартовое меню видно")
+    check(page.evaluate("() => window.__metro.mode") == "menu", "режим menu")
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(200)
+    check(page.evaluate("() => window.__metro.mode") == "playing", "Enter запускает заезд")
+    check(page.is_visible("#hud"), "HUD показан")
+    check(not page.is_visible("#menu"), "меню скрыто")
+
+    print("\n3. Разгон и коробка передач")
+    page.wait_for_timeout(900)
+    w = world(page)
+    check(w["player"]["speed"] > 3, f"машина разгоняется сама: speed={w['player']['speed']:.1f}")
+    check(w["player"]["gear"] == 1, "стартуем на 1-й передаче")
+    page.keyboard.press("e")
+    page.wait_for_timeout(100)
+    check(world(page)["player"]["gear"] == 2, "E — передача вверх")
+    check(page.inner_text("#hud-gear") == "2", "HUD показывает 2-ю передачу")
+    page.keyboard.press("q")
+    page.wait_for_timeout(100)
+    check(world(page)["player"]["gear"] == 1, "Q — передача вниз")
+
+    print("\n4. Полосы и прыжок")
+    page.keyboard.press("ArrowLeft")
+    page.wait_for_timeout(100)
+    check(world(page)["player"]["lane"] == 0, "← — левая полоса")
+    page.keyboard.press("ArrowRight")
+    page.keyboard.press("ArrowRight")
+    page.wait_for_timeout(100)
+    check(world(page)["player"]["lane"] == 2, "→ → — правая полоса")
+    page.keyboard.press("Space")
+    page.wait_for_timeout(120)
+    check(world(page)["player"]["jumping"] is True, "пробел — прыжок")
+    page.screenshot(path=os.path.join(SHOTS, "metro_play.png"))
+
+    print("\n5. Невалидная команда")
+    before = world(page)["player"]
+    accepted = page.evaluate("() => window.__metro.command('turbo')")
+    after = world(page)["player"]
+    check(accepted is False, "command('turbo') отклонена")
+    check(after["lane"] == before["lane"] and after["gear"] == before["gear"], "состояние не изменилось")
+
+    print("\n6. Пауза")
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(100)
+    z1 = world(page)["player"]["z"]
+    page.wait_for_timeout(400)
+    z2 = world(page)["player"]["z"]
+    check(page.is_visible("#pause"), "экран паузы показан")
+    check(z1 == z2, "мир стоит на паузе")
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(100)
+    check(page.evaluate("() => window.__metro.mode") == "playing", "Esc снимает паузу")
+
+    print("\n7. Ошибки в консоли")
+    real_errors = [e for e in errors if "fonts.g" not in e]
+    check(not real_errors, f"нет ошибок JS: {real_errors}")
+
     browser.close()
-    
-print('\n✅ Все браузерные тесты пройдены успешно!')
+
+print(f"\nСкриншоты: {SHOTS}/metro_menu.png, metro_play.png")
+if failures:
+    print(f"\n❌ Провалено проверок: {len(failures)}")
+    sys.exit(1)
+print("\n✅ Все браузерные проверки пройдены")
