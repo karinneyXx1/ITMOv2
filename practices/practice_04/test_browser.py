@@ -9,6 +9,7 @@
 4. Стрелки меняют полосу, пробел запускает прыжок.
 5. Невалидная команда отклоняется и не меняет состояние.
 6. Пауза по Esc останавливает мир.
+7. Сбой звука (unsupported): плашка видна, игра запускается сразу, команды работают.
 
 Запуск:  venv/bin/python test_browser.py
 Скриншоты сохраняются в папку из SCREENSHOT_DIR (по умолчанию — системная временная папка).
@@ -117,7 +118,54 @@ with sync_playwright() as p:
 
     browser.close()
 
-print(f"\nСкриншоты: {SHOTS}/metro_menu.png, metro_play.png")
+# Отдельная проверка со сбоем звука
+print("\n\n8. Сбой звука (unsupported)")
+with sync_playwright() as p:
+    browser = p.chromium.launch(headless=True)
+    page = browser.new_page(viewport={"width": 1440, "height": 900})
+    errors_sound = []
+    page.on("pageerror", lambda err: errors_sound.append(str(err)))
+    page.on("console", lambda msg: errors_sound.append(msg.text) if msg.type == "error" else None)
+
+    # Удаляем AudioContext перед загрузкой страницы
+    page.add_init_script("delete window.AudioContext; delete window.webkitAudioContext;")
+
+    page.goto(FILE_URL)
+    page.wait_for_load_state("networkidle")
+    page.wait_for_timeout(500)
+
+    # Запускаем игру
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(300)
+
+    check(page.evaluate("() => window.__metro.mode") == "playing", "Enter запускает заезд без звука")
+
+    # Проверяем, что плашка со статусом звука видна
+    status_visible = page.is_visible("#sound-status")
+    check(status_visible, "плашка статуса звука видна")
+
+    if status_visible:
+        status_text = page.inner_text("#sound-status")
+        check("не поддерживает Web Audio" in status_text, f"текст плашки содержит 'не поддерживает Web Audio': {status_text}")
+
+    # Проверяем, что игра работает
+    page.wait_for_timeout(200)
+    w_sound = world(page)
+    check(w_sound["player"]["speed"] > 0, f"машина разгоняется без звука: speed={w_sound['player']['speed']:.1f}")
+
+    # Проверяем команды
+    page.keyboard.press("e")
+    page.wait_for_timeout(100)
+    check(world(page)["player"]["gear"] == 2, "команды работают без звука")
+
+    page.screenshot(path=os.path.join(SHOTS, "metro_no_sound.png"))
+
+    real_errors_sound = [e for e in errors_sound if "fonts.g" not in e]
+    check(not real_errors_sound, f"нет ошибок JS при сбое звука: {real_errors_sound}")
+
+    browser.close()
+
+print(f"\nСкриншоты: {SHOTS}/metro_menu.png, metro_play.png, metro_no_sound.png")
 if failures:
     print(f"\n❌ Провалено проверок: {len(failures)}")
     sys.exit(1)

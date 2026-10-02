@@ -488,6 +488,11 @@ kbd {
   color: var(--paper);
 }
 
+.chip-sound-off {
+  background: var(--ink-soft);
+  color: var(--paper);
+}
+
 /* приборная панель */
 
 .dash {
@@ -716,6 +721,31 @@ kbd {
     opacity: 0;
     transform: translate(-50%, -80%) scale(1) rotate(-3deg);
   }
+}
+
+/* плашка статуса звука (сбои Web Audio) */
+
+.sound-status {
+  position: fixed;
+  left: 50%;
+  top: 12%;
+  transform: translateX(-50%);
+  padding: 12px 24px;
+  max-width: 90vw;
+  border: 3px solid var(--ink);
+  border-radius: 12px;
+  background: var(--sun-light);
+  box-shadow: var(--hard-shadow);
+  font: 700 15px/1.4 var(--font-body);
+  color: var(--ink);
+  text-align: center;
+  z-index: 100;
+  opacity: 1;
+  transition: opacity 0.3s ease-out;
+}
+
+.sound-status.fade-out {
+  opacity: 0;
 }
 
 /* ---------- тач-кнопки ---------- */

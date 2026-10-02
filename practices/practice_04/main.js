@@ -20,6 +20,7 @@
     best: $("hud-best"),
     magnet: $("hud-magnet"),
     magnetTime: $("hud-magnet-time"),
+    soundOff: $("hud-sound-off"),
     gear: $("hud-gear"),
     speed: $("hud-speed"),
     nitro: $("hud-nitro"),
@@ -28,6 +29,7 @@
     needle: $("tacho-needle"),
     tachoFill: $("tacho-fill"),
     toast: $("toast"),
+    soundStatus: $("sound-status"),
     menu: $("menu"),
     menuBest: $("menu-best"),
     pause: $("pause"),
@@ -227,6 +229,20 @@
 
   // ---------- экраны ----------
 
+  function showSoundStatus(message) {
+    if (!message) return;
+    ui.soundStatus.textContent = message;
+    ui.soundStatus.hidden = false;
+    ui.soundStatus.classList.remove("fade-out");
+    // Автоматически скрыть через 5 секунд
+    setTimeout(() => {
+      ui.soundStatus.classList.add("fade-out");
+      setTimeout(() => {
+        ui.soundStatus.hidden = true;
+      }, 300);
+    }, 5000);
+  }
+
   function show(screen) {
     ui.menu.hidden = screen !== "menu";
     ui.pause.hidden = screen !== "pause";
@@ -235,7 +251,7 @@
   }
 
   function start() {
-    sound.init();
+    // Запускаем игру сразу, звук инициализируется параллельно
     world = createWorld();
     rng = createRng(Date.now() & 0x7fffffff);
     needleRpm = 0;
@@ -243,6 +259,20 @@
     mode = "playing";
     show("hud");
     for (const key of Object.keys(lastHud)) delete lastHud[key];
+
+    // Инициализация звука идёт параллельно и не задерживает старт
+    initSound().then((result) => {
+      if (result.status === "available") {
+        sound.init();
+        ui.soundOff.hidden = true;
+      } else {
+        showSoundStatus(result.message);
+        ui.soundOff.hidden = false;
+      }
+    }).catch((err) => {
+      console.error("Неожиданная ошибка инициализации звука:", err);
+      ui.soundOff.hidden = false;
+    });
   }
 
   function pauseToggle() {

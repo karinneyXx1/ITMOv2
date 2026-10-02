@@ -1,6 +1,91 @@
 // Metro Rush — звук. Всё синтезируется через Web Audio API, без аудиофайлов.
 // Двигатель меняет тон от оборотов, короткие эффекты — на события игры.
 
+const SOUND_START_TIMEOUT_MS = 2000;
+
+// Глобальный контекст, создаваемый initSound и используемый createSound
+let globalAudioContext = null;
+let soundErrorLogged = false;
+
+// Асинхронная инициализация звука с обработкой всех сбоев.
+// Возвращает { status, message, ctx }, где status — один из:
+//   available, unsupported, blocked, timeout
+async function initSound() {
+  // Если контекст уже создан, повторно не создаём
+  if (globalAudioContext) {
+    if (globalAudioContext.state === "suspended") {
+      try {
+        await globalAudioContext.resume();
+      } catch {
+        // игнорируем ошибку повторного resume
+      }
+    }
+    return {
+      status: globalAudioContext.state === "running" ? "available" : "blocked",
+      ctx: globalAudioContext
+    };
+  }
+
+  const AC = (typeof window !== "undefined" && (window.AudioContext || window.webkitAudioContext)) || null;
+
+  if (!AC) {
+    return {
+      status: "unsupported",
+      message: "Звук недоступен: браузер не поддерживает Web Audio. Игра продолжится без звука.",
+    };
+  }
+
+  let ctx;
+  try {
+    ctx = new AC();
+    globalAudioContext = ctx;
+  } catch (err) {
+    return {
+      status: "blocked",
+      message: "Звук недоступен: браузер запретил воспроизведение. Игра продолжится без звука.",
+    };
+  }
+
+  if (ctx.state === "running") {
+    return { status: "available", ctx };
+  }
+
+  // Ждём resume() с таймаутом
+  let timeoutId;
+  try {
+    const resumePromise = ctx.resume();
+    const timeoutPromise = new Promise((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error("timeout")), SOUND_START_TIMEOUT_MS);
+    });
+    await Promise.race([resumePromise, timeoutPromise]);
+
+    // Очищаем таймер после успешного завершения
+    if (timeoutId) clearTimeout(timeoutId);
+
+    if (ctx.state === "running") {
+      return { status: "available", ctx };
+    } else {
+      return {
+        status: "timeout",
+        message: "Звук не включился за 2 секунды. Игра продолжится без звука.",
+      };
+    }
+  } catch (err) {
+    if (timeoutId) clearTimeout(timeoutId);
+
+    if (err.message === "timeout") {
+      return {
+        status: "timeout",
+        message: "Звук не включился за 2 секунды. Игра продолжится без звука.",
+      };
+    }
+    return {
+      status: "blocked",
+      message: "Звук недоступен: браузер запретил воспроизведение. Игра продолжится без звука.",
+    };
+  }
+}
+
 function createSound() {
   let ctx = null;
   let master = null;
@@ -8,83 +93,114 @@ function createSound() {
   let muted = false;
   let noiseBuffer = null;
 
-  // AudioContext можно создать только после жеста пользователя (Enter/клик).
+  // Использует глобальный контекст, созданный initSound
   function init() {
     if (ctx) {
       if (ctx.state === "suspended") ctx.resume();
       return;
     }
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return;
-    ctx = new AC();
-    master = ctx.createGain();
-    master.gain.value = muted ? 0 : 0.55;
-    master.connect(ctx.destination);
 
-    const filter = ctx.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.value = 900;
-    const gain = ctx.createGain();
-    gain.gain.value = 0;
-    const low = ctx.createOscillator();
-    low.type = "sawtooth";
-    const high = ctx.createOscillator();
-    high.type = "square";
-    const highGain = ctx.createGain();
-    highGain.gain.value = 0.25;
-    low.connect(filter);
-    high.connect(highGain).connect(filter);
-    filter.connect(gain).connect(master);
-    low.start();
-    high.start();
-    engine = { low, high, filter, gain };
+    try {
+      // Используем глобальный контекст, если он есть
+      ctx = globalAudioContext;
+      if (!ctx) {
+        // Фолбэк: если initSound не был вызван, создаём контекст
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        ctx = new AC();
+        globalAudioContext = ctx;
+      }
 
-    noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 0.6, ctx.sampleRate);
-    const data = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+      master = ctx.createGain();
+      master.gain.value = muted ? 0 : 0.55;
+      master.connect(ctx.destination);
+
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.value = 900;
+      const gain = ctx.createGain();
+      gain.gain.value = 0;
+      const low = ctx.createOscillator();
+      low.type = "sawtooth";
+      const high = ctx.createOscillator();
+      high.type = "square";
+      const highGain = ctx.createGain();
+      highGain.gain.value = 0.25;
+      low.connect(filter);
+      high.connect(highGain).connect(filter);
+      filter.connect(gain).connect(master);
+      low.start();
+      high.start();
+      engine = { low, high, filter, gain };
+
+      noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 0.6, ctx.sampleRate);
+      const data = noiseBuffer.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    } catch (err) {
+      logSoundError(err);
+    }
+  }
+
+  function logSoundError(err) {
+    if (!soundErrorLogged) {
+      console.error("Ошибка воспроизведения звука:", err);
+      soundErrorLogged = true;
+    }
   }
 
   function setEngine(rpmValue, gear, running) {
     if (!ctx || !engine) return;
-    const t = ctx.currentTime;
-    const r = Math.max(0, Math.min(1.1, rpmValue));
-    const freq = 42 + r * 120 + gear * 7;
-    engine.low.frequency.setTargetAtTime(freq, t, 0.04);
-    engine.high.frequency.setTargetAtTime(freq * 2.01, t, 0.04);
-    engine.filter.frequency.setTargetAtTime(500 + r * 1600, t, 0.05);
-    engine.gain.gain.setTargetAtTime(running ? 0.07 + r * 0.06 : 0, t, 0.08);
+    try {
+      const t = ctx.currentTime;
+      const r = Math.max(0, Math.min(1.1, rpmValue));
+      const freq = 42 + r * 120 + gear * 7;
+      engine.low.frequency.setTargetAtTime(freq, t, 0.04);
+      engine.high.frequency.setTargetAtTime(freq * 2.01, t, 0.04);
+      engine.filter.frequency.setTargetAtTime(500 + r * 1600, t, 0.05);
+      engine.gain.gain.setTargetAtTime(running ? 0.07 + r * 0.06 : 0, t, 0.08);
+    } catch (err) {
+      logSoundError(err);
+    }
   }
 
   function tone(freq, duration, { type = "square", volume = 0.2, slideTo = null, delay = 0 } = {}) {
     if (!ctx) return;
-    const t = ctx.currentTime + delay;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, t);
-    if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, t + duration);
-    gain.gain.setValueAtTime(volume, t);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
-    osc.connect(gain).connect(master);
-    osc.start(t);
-    osc.stop(t + duration + 0.02);
+    try {
+      const t = ctx.currentTime + delay;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, t);
+      if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, t + duration);
+      gain.gain.setValueAtTime(volume, t);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+      osc.connect(gain).connect(master);
+      osc.start(t);
+      osc.stop(t + duration + 0.02);
+    } catch (err) {
+      logSoundError(err);
+    }
   }
 
   function noise(duration, { volume = 0.3, from = 2000, to = 200 } = {}) {
     if (!ctx || !noiseBuffer) return;
-    const t = ctx.currentTime;
-    const src = ctx.createBufferSource();
-    src.buffer = noiseBuffer;
-    const filter = ctx.createBiquadFilter();
-    filter.type = "bandpass";
-    filter.frequency.setValueAtTime(from, t);
-    filter.frequency.exponentialRampToValueAtTime(to, t + duration);
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(volume, t);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
-    src.connect(filter).connect(gain).connect(master);
-    src.start(t);
-    src.stop(t + duration);
+    try {
+      const t = ctx.currentTime;
+      const src = ctx.createBufferSource();
+      src.buffer = noiseBuffer;
+      const filter = ctx.createBiquadFilter();
+      filter.type = "bandpass";
+      filter.frequency.setValueAtTime(from, t);
+      filter.frequency.exponentialRampToValueAtTime(to, t + duration);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(volume, t);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+      src.connect(filter).connect(gain).connect(master);
+      src.start(t);
+      src.stop(t + duration);
+    } catch (err) {
+      logSoundError(err);
+    }
   }
 
   return {
@@ -117,5 +233,18 @@ function createSound() {
       if (master) master.gain.setTargetAtTime(muted ? 0 : 0.55, ctx.currentTime, 0.02);
     },
     isMuted: () => muted,
+  };
+}
+
+// Экспорт для тестов в Node.js
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = {
+    initSound,
+    createSound,
+    // Для тестов: сброс глобального состояния
+    _resetForTests: () => {
+      globalAudioContext = null;
+      soundErrorLogged = false;
+    }
   };
 }
