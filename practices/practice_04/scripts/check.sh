@@ -2,7 +2,7 @@
 # Единая проверка Metro Rush. Её запускают человек вручную и hook
 # .opencode/plugins/check-after-edit.js после каждой правки агента.
 #
-#   sh scripts/check.sh          — синтаксис JS + юнит-тесты (быстро, ~1 с)
+#   sh scripts/check.sh          — синтаксис JS + юнит-тесты игры, звука и MCP (~2 с)
 #   sh scripts/check.sh --full   — плюс браузерный тест в headless Chromium
 #
 # Последняя строка вывода — всегда "CHECK: PASS" или "CHECK: FAIL".
@@ -44,8 +44,22 @@ else
   status=1
 fi
 
+echo "== 4. MCP-сервер (cd mcp && npm test)"
+if [ -d mcp/node_modules ]; then
+  mcp_out=$(cd mcp && npm test --silent 2>&1)
+  if [ $? -eq 0 ]; then
+    echo "$mcp_out" | grep -E "^ℹ (tests|pass|fail) "
+  else
+    echo "$mcp_out" | sed -n '/✖ failing tests/,$p'
+    echo "$mcp_out" | grep -E "^ℹ (tests|pass|fail) "
+    status=1
+  fi
+else
+  echo "  пропущен: нет mcp/node_modules (cd mcp && npm install)"
+fi
+
 if [ "${1:-}" = "--full" ]; then
-  echo "== 4. Браузерный тест (test_browser.py)"
+  echo "== 5. Браузерный тест (test_browser.py)"
   if [ -x venv/bin/python ]; then
     browser_out=$(venv/bin/python test_browser.py 2>&1)
     if [ $? -eq 0 ]; then

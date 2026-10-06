@@ -20,20 +20,31 @@ Metro Rush (бывш. Race Mini) — браузерный раннер-гонк�
 - Рендер: HTML5 Canvas 2D (псевдо-3D проекция), UI — HTML/CSS поверх canvas
 - Звук: Web Audio API, всё синтезируется кодом (никаких аудиофайлов)
 - Тесты: встроенный `node:test` / `node:assert`; браузерные — Python Playwright
-- Зависимости: НЕТ npm-пакетов в проекте. Шрифты (Bungee, Rubik) — с Google
-  Fonts, без интернета работает фолбэк на системные
+- Зависимости: в **игре** НЕТ npm-пакетов — открыл `index.html`, и работает.
+  Единственное исключение — папка `mcp/` (инструмент для агента, не часть игры):
+  там SDK MCP и zod. Шрифты (Bungee, Rubik) — с Google Fonts, без интернета
+  работает фолбэк на системные
 
 ## Структура кода
 | Файл | Что внутри | Можно ли трогать DOM |
 |---|---|---|
 | `game.js` | Вся игровая логика: КПП, физика, прыжок, генерация трассы, столкновения, счёт. Чистые функции, экспорт через `module.exports` + глобально через `<script>` | Нет |
 | `render.js` | `createRenderer(canvas)` — камера, проекция, отрисовка трассы, поездов, машины, частиц | Только canvas |
-| `audio.js` | `createSound()` — двигатель (тон от оборотов) и звуки событий | Только Web Audio |
+| `audio.js` | `initSound()` — запуск звука с лимитом 2 с и статусом (фича B); `createSound()` — двигатель и звуки событий, все вызовы под `try/catch` | Только Web Audio |
 | `main.js` | Ввод (клавиатура, свайпы), игровой цикл, HUD, экраны, рекорд в localStorage, хук `window.__metro` для тестов | Да |
 | `index.html` | Разметка: canvas, HUD, меню, пауза, конец заезда | — |
 | `styles.css` | Стили интерфейса, токены из docs/DESIGN.md | — |
-| `test_game.js` | Юнит-тесты game.js: `node test_game.js` | — |
+| `test_game.js` | Юнит-тесты game.js (фича A и вся логика): `node test_game.js` | — |
+| `test_audio.js` | Юнит-тесты звука (фича B) с подменным `AudioContext`: `node test_audio.js` | — |
 | `test_browser.py` | Сквозная проверка в headless Chromium: `venv/bin/python test_browser.py` | — |
+| `scripts/check.sh` | Runner: единая проверка проекта (его же запускает hook) | — |
+| `mcp/` | Свой MCP-сервер `metro-rush` (`server.mjs`), ядро симуляции (`simulate.js`), тесты | — |
+| `.opencode/plugins/check-after-edit.js` | Hook: автопроверка после правки агентом | — |
+| `docs/requirements.md` | Контракт фич A и B | — |
+| `docs/style-guide.md` | 5 правил кода с примерами | — |
+| `docs/HANDOFF.md` | Состояние проекта для новой сессии | — |
+| `docs/DESIGN.md` | Визуальный стиль | — |
+| `reflection.md` | Рефлексия автора по практике — не трогай | — |
 
 Поток данных за кадр: `main.js` читает ввод → `applyCommand(world, cmd)` /
 `step(world, dt, input, rng)` из game.js → новый `world` + `world.events`
@@ -70,8 +81,9 @@ Metro Rush (бывш. Race Mini) — браузерный раннер-гонк�
   happy path, границы и невалидный ввод. Только потом — рендер и HUD.
 - Тесты: только `node:test`/`node:assert`. Один тест = одна проверка поведения,
   говорящее название на русском.
-- Не добавлять npm-зависимости, TypeScript, бандлеры без явного согласования —
-  проект должен оставаться "открыл файл — заработало".
+- Не добавлять npm-зависимости, TypeScript, бандлеры в игру без явного
+  согласования — она должна оставаться "открыл файл — заработало". Код игры
+  не импортирует ничего из `mcp/`.
 - Git не трогать: папка — часть большого репозитория курса, коммитит автор сам.
 
 ## Скиллы (`.agents/skills`, список — в skills-lock.json)
@@ -84,16 +96,23 @@ Metro Rush (бывш. Race Mini) — браузерный раннер-гонк�
 - **test-driven-development** — любая новая фича или багфикс в логике.
   Цикл: тест → увидеть правильное падение (`sh scripts/check.sh`) → минимальный
   код → зелёный. Перед написанием тестов прочитай его `writing-good-tests.md`.
+- **metro-balance-check** (свой) — после правки чисел геймплея в `game.js`
+  (передачи, ускорение, прыжок, нитро, сложность, очки): сравнивает баланс
+  «до/после» на одних и тех же трассах и объясняет, стало легче или сложнее.
 
 Установка/восстановление скиллов: `npx skills experimental_install`.
 
 ## MCP (opencode.json)
 - **playwright** — управление браузером: открыть `index.html`, нажимать клавиши,
   снимать скриншоты.
-- **chrome-devtools** — производительность: запиши трейс, если падает FPS,
-  смотри консоль и долгие кадры.
 - **context7** — актуальная документация по Canvas 2D, Web Audio, Playwright,
   когда нужен точный API.
+- **metro-rush** (свой, `mcp/server.mjs`) — инструмент `simulate_run(seed, seconds,
+  actions, autopilot)`: прогоняет заезд на логике `game.js` без браузера и
+  возвращает итог (краш, дистанция, очки, переключения). Используй, чтобы проверить
+  баланс КПП или проходимость трассы. Папка `mcp/` — единственное место с
+  npm-зависимостями (SDK MCP, zod), сама игра их не использует.
+  Установка: `cd mcp && npm install`, тесты: `cd mcp && npm test`.
 
 ## Дизайн
 Полный визуальный бриф — в docs/DESIGN.md. Коротко: граффити-стиль уличного
@@ -103,8 +122,10 @@ Metro Rush (бывш. Race Mini) — браузерный раннер-гонк�
 не копируем — только язык стиля.
 
 ## Как проверить работу
-Единая команда проверки — **`sh scripts/check.sh`** (синтаксис всех JS + юнит-тесты,
-~1 с). Последняя строка — `CHECK: PASS` или `CHECK: FAIL`.
+Единая команда проверки — **`sh scripts/check.sh`** (~2 с): синтаксис JS,
+`test_game.js`, `test_audio.js`, тесты MCP (`cd mcp && npm test`; если нет
+`mcp/node_modules` — шаг пропускается с подсказкой). Последняя строка —
+`CHECK: PASS` или `CHECK: FAIL`.
 - `sh scripts/check.sh --full` — плюс браузерный тест `test_browser.py`
   (окружение: `python3 -m venv venv && venv/bin/pip install playwright && venv/bin/playwright install chromium`)
 - Вручную: открыть `index.html` в браузере, Enter — поехали.
@@ -114,7 +135,9 @@ Metro Rush (бывш. Race Mini) — браузерный раннер-гонк�
 
 ## Hook: автопроверка после правки
 `.opencode/plugins/check-after-edit.js` — после каждого `edit`/`write`/`apply_patch`
-файла игры (`game.js`, `render.js`, `audio.js`, `main.js`, `test_game.js`,
-`index.html`, `styles.css`) запускает `sh scripts/check.sh` и дописывает результат
-в ответ инструмента. Увидел `[hook check-after-edit] ... FAIL` — сначала исправь
+файла игры или MCP (`game.js`, `render.js`, `audio.js`, `main.js`, `test_game.js`,
+`test_audio.js`, `index.html`, `styles.css`, `mcp/simulate.js`, `mcp/server.mjs`,
+`mcp/test_*`) запускает `sh scripts/check.sh` и дописывает результат в ответ
+инструмента. Вывод хука не виден в интерфейсе OpenCode — он приходит тебе в
+ответе инструмента. Увидел `[hook check-after-edit] ... FAIL` — сначала исправь
 ошибку, потом продолжай задачу.

@@ -25,13 +25,13 @@
       "type": "local",
       "command": ["npx", "-y", "@playwright/mcp@latest"]
     },
-    "chrome-devtools": {
-      "type": "local",
-      "command": ["npx", "-y", "chrome-devtools-mcp@latest"]
-    },
     "context7": {
       "type": "local",
       "command": ["npx", "-y", "@upstash/context7-mcp@latest"]
+    },
+    "metro-rush": {
+      "type": "local",
+      "command": ["node", "mcp/server.mjs"]
     }
   }
 }

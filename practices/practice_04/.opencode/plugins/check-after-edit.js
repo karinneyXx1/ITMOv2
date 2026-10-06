@@ -13,14 +13,20 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const CHECK_SCRIPT = path.join(ROOT, "scripts", "check.sh");
 
 const EDIT_TOOLS = new Set(["edit", "write", "apply_patch", "multiedit", "patch"]);
+// Пути относительно корня проекта.
 const WATCHED = new Set([
   "game.js",
   "render.js",
   "audio.js",
   "main.js",
   "test_game.js",
+  "test_audio.js",
   "index.html",
   "styles.css",
+  "mcp/simulate.js",
+  "mcp/server.mjs",
+  "mcp/test_simulate.js",
+  "mcp/test_server.mjs",
 ]);
 const TIMEOUT_MS = 120_000;
 
@@ -34,10 +40,10 @@ function touchedFiles(args) {
   return [];
 }
 
-// Файл относится к игре, если лежит прямо в корне проекта и входит в WATCHED.
+// Файл отслеживается, если его путь относительно корня проекта входит в WATCHED.
 function isGameFile(file, baseDir) {
-  const abs = path.resolve(baseDir, file);
-  return path.dirname(abs) === ROOT && WATCHED.has(path.basename(abs));
+  const rel = path.relative(ROOT, path.resolve(baseDir, file)).split(path.sep).join("/");
+  return WATCHED.has(rel);
 }
 
 function runCheck() {
@@ -69,7 +75,9 @@ export const CheckAfterEdit = async ({ directory }) => ({
 
     const { code, out } = await runCheck();
     const verdict = code === 0 ? "PASS" : "FAIL";
-    const names = files.map((f) => path.basename(f)).join(", ");
+    const names = files
+      .map((f) => path.relative(ROOT, path.resolve(directory || ROOT, f)).split(path.sep).join("/"))
+      .join(", ");
     output.output =
       `${output.output ?? ""}\n\n` +
       `[hook check-after-edit] изменён ${names} → sh scripts/check.sh: ${verdict}\n` +
