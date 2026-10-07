@@ -103,8 +103,6 @@ Metro Rush (бывш. Race Mini) — браузерный раннер-гонк�
 Установка/восстановление скиллов: `npx skills experimental_install`.
 
 ## MCP (opencode.json)
-- **playwright** — управление браузером: открыть `index.html`, нажимать клавиши,
-  снимать скриншоты.
 - **context7** — актуальная документация по Canvas 2D, Web Audio, Playwright,
   когда нужен точный API.
 - **metro-rush** (свой, `mcp/server.mjs`) — инструмент `simulate_run(seed, seconds,
