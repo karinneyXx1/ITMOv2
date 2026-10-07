@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Практика 4 — отчёт</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1c2541;
+    --ink-soft: #4a5577;
+    --paper: #ffffff;
+    --bg: #eef4fa;
+    --sun: #ffd92e;
+    --flame: #ff9a1f;
+    --ember: #f2541b;
+    --steel: #6f93c0;
+    --mist: #d9e8f5;
+    --go: #1f9d5c;
+    --wait: #b26a00;
+    --code-bg: #1c2541;
+    --code-fg: #e8eefc;
+    --card-shadow: 6px 6px 0 var(--ink);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink: #e6ecf8; --ink-soft: #a9b4cf; --paper: #1d2436; --bg: #121827;
+      --mist: #2a3450; --go: #4fd18b; --wait: #ffb347; --code-bg: #0b1020; --code-fg: #e8eefc;
+      --card-shadow: 6px 6px 0 #000;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 400 16px/1.6 "Rubik", system-ui, -apple-system, sans-serif;
+  }
+  main { max-width: 960px; margin: 0 auto; padding: 32px 16px 80px; }
+  a { color: inherit; text-decoration-color: var(--flame); text-underline-offset: 3px; }
+  a:hover { color: var(--ember); }
+  code { font: 500 0.9em/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--mist); padding: 1px 5px; border-radius: 5px; }
+  pre { margin: 12px 0 0; padding: 14px 16px; background: var(--code-bg); color: var(--code-fg); border-radius: 12px; overflow-x: auto; font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; }
+  pre code { background: none; padding: 0; color: inherit; }
+
+  header.hero { margin-bottom: 28px; }
+  .title { font: 900 clamp(34px, 7vw, 60px)/1.05 "Rubik", system-ui, sans-serif; letter-spacing: -0.01em; margin: 0 0 10px; color: var(--ink); }
+  .title span { color: var(--ember); }
+  .lead { font-size: 18px; max-width: 62ch; margin: 0 0 14px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; margin: 0; list-style: none; }
+  .meta li { background: var(--paper); border: 2px solid var(--ink); border-radius: 999px; padding: 3px 12px; font-size: 14px; }
+
+  nav.toc { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0 8px; }
+  nav.toc a { text-decoration: none; background: var(--sun); color: #1c2541; border: 2px solid var(--ink); border-radius: 999px; padding: 4px 14px; font-weight: 700; box-shadow: 3px 3px 0 var(--ink); }
+  nav.toc a:hover { transform: translate(-1px, -1px); }
+
+  section.block { margin-top: 44px; }
+  .block-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; border-bottom: 3px solid var(--ink); padding-bottom: 6px; margin-bottom: 16px; }
+  .block-head h2 { margin: 0; font: 900 26px/1.2 "Rubik", sans-serif; }
+  .points { font: 700 15px/1 "Rubik", sans-serif; background: var(--ink); color: var(--bg); padding: 6px 12px; border-radius: 999px; }
+
+  .card { background: var(--paper); border: 3px solid var(--ink); border-radius: 18px; box-shadow: var(--card-shadow); padding: 18px 20px; margin: 18px 0; }
+  .card h3 { margin: 0 0 8px; font: 700 19px/1.3 "Rubik", sans-serif; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .card p { margin: 8px 0; }
+  .label { font-weight: 700; }
+  .files { margin: 6px 0 0; padding-left: 18px; }
+  .files li { margin: 2px 0; }
+
+  .status { font: 700 12px/1 "Rubik", sans-serif; padding: 4px 9px; border-radius: 999px; border: 2px solid currentColor; white-space: nowrap; }
+  .status.ok { color: var(--go); }
+  .status.wait { color: var(--wait); }
+
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 15px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--mist); vertical-align: top; }
+  th { font-weight: 700; border-bottom: 2px solid var(--ink); }
+  .table-wrap { overflow-x: auto; }
+
+  .evidence { margin-top: 12px; padding-top: 10px; border-top: 2px dashed var(--mist); }
+  .evidence summary { cursor: pointer; font-weight: 700; }
+
+  .demo-slot { margin-top: 12px; border: 2px dashed var(--wait); border-radius: 12px; padding: 12px 14px; background: color-mix(in srgb, var(--wait) 8%, transparent); }
+  .demo-slot .slot-title { font-weight: 700; color: var(--wait); }
+  .demo-slot blockquote { margin: 6px 0 0; font-style: italic; }
+
+  .note { font-size: 14px; color: var(--ink-soft); }
+
+  figure.shot { margin: 14px 0 0; }
+  figure.shot img { display: block; width: 100%; height: auto; border: 2px solid var(--ink); border-radius: 12px; }
+  figure.shot figcaption { margin-top: 6px; font-size: 14px; color: var(--ink-soft); }
+  .prompt { margin: 10px 0 0; padding: 10px 14px; border-left: 4px solid var(--steel); background: var(--mist); border-radius: 0 10px 10px 0; font-size: 15px; }
+  .prompt b { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); margin-bottom: 2px; }
+  footer { margin-top: 56px; padding-top: 16px; border-top: 3px solid var(--ink); font-size: 14px; color: var(--ink-soft); }
+</style>
+</head>
+<body>
+<main>
+
+<header class="hero">
+  <h1 class="title">Практика 4<span>·</span>среда агента</h1>
+  <p class="lead">Две фичи с агентом в OpenCode на своём проекте — браузерной игре
+    <a href="../index.html">Metro Rush</a> — и среда, которая делает работу агента проверяемой:
+    правила, skills, MCP и автоматическая проверка после каждой правки.</p>
+  <ul class="meta">
+    <li>Карина Гатиатуллина</li>
+    <li>OpenCode 1.18.34</li>
+    <li>ветка <code>practice_4</code></li>
+    <li><a href="../README.md">задание (README)</a></li>
+  </ul>
+  <p class="note">OpenCode 2.0.20 из презентации не опубликован, поэтому конфиги и hook — в формате 1.x.
+    Учебный ключ VseLLM исчерпал лимит (ответ <code>402</code>), поэтому демонстрации 07.10 сделаны на бесплатной модели
+    OpenCode <code>big-pickle</code> — инструменты от модели не зависят. Подтверждения — скриншоты чата и логи из базы
+    OpenCode.</p>
+  <nav class="toc" aria-label="Разделы">
+    <a href="#env">А. Среда</a>
+    <a href="#skill">Б. Свой skill</a>
+    <a href="#mcp">В. Свой MCP</a>
+    <a href="#reflection">Г. Рефлексия</a>
+    <a href="#practice">Ход практики</a>
+  </nav>
+</header>
+
+<!-- ============================ А ============================ -->
+<section class="block" id="env">
+  <div class="block-head"><h2>А. Настроенная среда</h2></div>
+
+  <div class="table-wrap"><table>
+    <thead><tr><th>Критерий</th><th>Файлы</th><th>Подтверждение применения</th></tr></thead>
+    <tbody>
+      <tr><td>AGENTS.md</td><td><a href="../AGENTS.md">AGENTS.md</a></td><td><span class="status ok">агент назвал контракт, тест и ограничения</span></td></tr>
+      <tr><td>skill</td><td><a href="../.agents/skills/">.agents/skills/</a></td><td><span class="status ok">4 загрузки агентом</span></td></tr>
+      <tr><td>MCP</td><td><a href="../opencode.json">opencode.json</a></td><td><span class="status ok">context7 ×3, metro-rush ×3</span></td></tr>
+      <tr><td>hook</td><td><a href="../.opencode/plugins/check-after-edit.js">check-after-edit.js</a>, <a href="../scripts/check.sh">check.sh</a></td><td><span class="status ok">19 срабатываний, 5 FAIL</span></td></tr>
+      <tr><td>обоснование</td><td><a href="connections.md">connections.md</a></td><td><span class="status ok">готово</span></td></tr>
+    </tbody>
+  </table></div>
+
+  <!-- AGENTS.md -->
+  <article class="card">
+    <h3>AGENTS.md — правила проекта <span class="status ok">применялся</span></h3>
+    <p>Агент в каждом новом чате начинает с нуля, и OpenCode автоматически даёт ему этот файл. В нём: где контракт,
+      какой командой проверять, что нельзя трогать (git, тесты фичи A, runner), структура проекта, skills и MCP.</p>
+    <ul class="files">
+      <li><a href="../AGENTS.md">AGENTS.md</a> — правила</li>
+      <li><a href="../docs/requirements.md">docs/requirements.md</a> — контракт фич A и B (требование → тест)</li>
+      <li><a href="../docs/style-guide.md">docs/style-guide.md</a> — 5 правил кода, у каждого пример в коде и проверка</li>
+    </ul>
+    <div class="evidence">
+      <p><span class="label">Применение:</span> фичу B агент делал в новом чате в отдельном worktree — прочитал AGENTS.md,
+        сам нашёл контракт, запускал <code>sh scripts/check.sh --full</code> и не делал коммитов.</p>
+      <p class="prompt"><b>Демо · правила</b>«Прочитай AGENTS.md. Найди контракт и тест-пример. Назови ограничения фичи A и команду проверки проекта. Ничего не меняй.»</p>
+      <p>Агент прочитал AGENTS.md, по ссылкам из него нашёл <code>docs/requirements.md</code> и тест
+        <code>test_game.js:342</code>, перечислил требования A1–A4 и назвал реальную команду проверки
+        <code>sh scripts/check.sh</code> (и <code>--full</code> для A4).</p>
+      <figure class="shot"><img src="img/demo2-agents.jpg" alt="Агент читает AGENTS.md и называет контракт, тест-пример, ограничения фичи A и команду проверки" loading="lazy">
+        <figcaption>Демо 2 — правила из AGENTS.md (Big Pickle, 07.10)</figcaption></figure>
+      <p class="prompt"><b>Демо · style guide</b>«Прочитай docs/style-guide.md. Назови одно правило и место в коде, где оно выполнено, с номером строки. Ничего не меняй.»</p>
+      <p>Правило 2 «внешний ввод валидируется первой строкой и громко» → <code>game.js:332–333</code>,
+        первая строка <code>applyCommand()</code> — <code>validateCommand(command)</code>.</p>
+      <figure class="shot"><img src="img/demo3-style-guide.jpg" alt="Агент называет правило 2 из style guide и строку game.js, где оно выполнено" loading="lazy">
+        <figcaption>Демо 3 — правило style guide связано с реальным местом в коде</figcaption></figure>
+    </div>
+  </article>
+
+  <!-- skills -->
+  <article class="card">
+    <h3>Skills <span class="status ok">применялись</span></h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Skill</th><th>Зачем</th><th>Загружен агентом</th></tr></thead>
+      <tbody>
+        <tr><td><a href="../.agents/skills/test-driven-development/SKILL.md">test-driven-development</a><br><span class="note">+ <a href="../.agents/skills/test-driven-development/writing-good-tests.md">writing-good-tests.md</a></span></td>
+            <td>сначала падающий тест — для фичи B, где сбой звука руками не воспроизвести</td><td>02.10 16:33, «Реализация фичи B»</td></tr>
+        <tr><td><a href="../.agents/skills/webapp-testing/SKILL.md">webapp-testing</a></td>
+            <td>проверка игры в настоящем браузере (<a href="../test_browser.py">test_browser.py</a>)</td><td>02.10 11:10, «Валидация команд игрока»</td></tr>
+        <tr><td><a href="../.agents/skills/frontend-design/SKILL.md">frontend-design</a></td>
+            <td>правки интерфейса в стиле <a href="../docs/DESIGN.md">DESIGN.md</a>, а не шаблонно</td><td>07.10 00:17, «3 улучшения экрана Заезд окончен»</td></tr>
+        <tr><td><a href="../.agents/skills/metro-balance-check/SKILL.md">metro-balance-check</a> (свой)</td>
+            <td>баланс игры «до/после» правки — см. блок Б</td><td>07.10 08:50, демо скилла</td></tr>
+      </tbody>
+    </table></div>
+    <details class="evidence">
+      <summary>Ответ агента с frontend-design (Big Pickle, 07.10)</summary>
+<pre>Коротко: 3 улучшения экрана «Заезд окончен» с опорой на docs/DESIGN.md (граффити-стиль). Файлы не менял.
+
+1) Граффити-заголовок вместо нейтрального h2 — та же стилистика, что у крупных надписей:
+   жёлто-оранжевый градиент + толстая тёмно-синяя обводка + смещённая тень.
+2) «Новый рекорд!» как единичный бейдж — показывать только при новом рекорде,
+   одно оркестрованное появление, «как рекомендует дизайн-принцип».
+3) Явная иерархия результатов — Дистанция и Очки крупнее, остальное компактнее.</pre>
+      <p class="note">Наблюдение: пункт 2 предлагает бейдж, который в игре уже есть (<code>#new-record</code>), а пункт 3 — кнопку «В меню»,
+        которой на этом экране нет. Агент не сверился с разметкой — его советы по дизайну приходится фильтровать.</p>
+    </details>
+  </article>
+
+  <!-- MCP -->
+  <article class="card">
+    <h3>MCP <span class="status ok">применялся</span></h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Сервер</th><th>Зачем</th></tr></thead>
+      <tbody>
+        <tr><td><code>context7</code></td><td>актуальная документация API (Web Audio, Canvas) вместо «памяти» модели — для фичи B: как проверить запуск звука и ограничить ожидание</td></tr>
+        <tr><td><code>metro-rush</code> (свой)</td><td>прогон заезда на логике игры без браузера — см. блок В</td></tr>
+      </tbody>
+    </table></div>
+    <p class="note">Подключения из настройки, которые агент ни разу не вызвал (chrome-devtools, playwright), я убрала:
+      лишние подключения только усложняют среду. Конфиг: <a href="../opencode.json">opencode.json</a>.</p>
+    <div class="evidence">
+      <p class="prompt"><b>Демо · context7</b>«Первым действием используй MCP context7. Найди в документации Web Audio API, как проверить, что AudioContext запущен, и как ограничить время ожидания resume(). Ничего не меняй.»</p>
+      <p>Агент вызвал <code>context7_resolve-library-id</code> и дважды <code>context7_query-docs</code> по спецификации
+        Web Audio API. Ответ по документации: запуск проверяется через <code>context.state === "running"</code> и событие
+        <code>statechange</code>; у <code>resume()</code> <b>нет встроенного таймаута</b>, поэтому лимит делается в приложении —
+        <code>Promise.race</code> с таймером. Ровно так и устроена фича B (<code>SOUND_START_TIMEOUT_MS = 2000</code>):
+        документация подтвердила решение, а не «память» модели.</p>
+      <figure class="shot"><img src="img/demo4-context7.jpg" alt="Агент вызывает context7 resolve-library-id и query-docs и отвечает по документации Web Audio API" loading="lazy">
+        <figcaption>Демо 4 — реальные вызовы context7 (07.10 08:44)</figcaption></figure>
+    </div>
+  </article>
+
+  <!-- hook -->
+  <article class="card">
+    <h3>Hook + runner — автоматическая проверка <span class="status ok">применялся</span></h3>
+    <p>После каждой правки агентом файла игры или MCP плагин запускает <code>sh scripts/check.sh</code>
+      (синтаксис, 58 тестов логики, 12 тестов звука, 12 тестов MCP) и дописывает результат в ответ инструмента —
+      агент сразу видит, что сломал.</p>
+    <ul class="files">
+      <li><a href="../.opencode/plugins/check-after-edit.js">.opencode/plugins/check-after-edit.js</a> — hook (<code>tool.execute.after</code>, формат OpenCode 1.x)</li>
+      <li><a href="../scripts/check.sh">scripts/check.sh</a> — runner, последняя строка <code>CHECK: PASS</code> / <code>CHECK: FAIL</code></li>
+    </ul>
+    <div class="evidence">
+      <p><span class="label">Применение:</span> по логам OpenCode hook сработал <b>19 раз</b> (5 раз — FAIL). Во время работы над фичей B —
+        16 раз, из них <b>4 FAIL</b>: агент получал упавший тест и исправлял его до того, как отдать работу.
+        Отдельно показан сценарий из слайда 14: временно сломанный тест (<code>kmh(10)</code> → 61) дал FAIL, исправление — PASS.
+        И ещё раз — в демо скилла (блок Б): правка <code>BASE_ACCEL</code> 9 → 12 → hook <b>FAIL</b> (упал тест MCP),
+        откат на 9 → hook <b>PASS</b>.</p>
+      <details>
+        <summary>Реальный ответ hook агенту — 02.10 16:49, правка audio.js</summary>
+<pre>[hook check-after-edit] изменён audio.js → sh scripts/check.sh: FAIL
+== 1. Синтаксис JS
+  ok  game.js / render.js / audio.js / main.js / test_game.js / test_audio.js
+== 2. Юнит-тесты логики (node test_game.js)
+ℹ tests 58
+ℹ pass 58
+ℹ fail 0
+== 3. Юнит-тесты звука (node test_audio.js)
+✖ failing tests:
+✖ initSound возвращает тот же контекст, который будет использовать createSound
+  TypeError: high.connect(...).connect is not a function
+✖ setEngine не бросает исключение при сбое
+  TypeError: high.connect(...).connect is not a function
+✖ ошибка звука логируется только один раз на весь модуль
+…
+CHECK: FAIL
+Исправь ошибки выше, прежде чем продолжать.</pre>
+      </details>
+      <p class="note">Вывод hook не виден в интерфейсе OpenCode — он уходит модели; поэтому подтверждения взяты из базы
+        OpenCode (<code>~/.local/share/opencode/opencode.db</code>).</p>
+    </div>
+  </article>
+
+  <!-- обоснование -->
+  <article class="card">
+    <h3>Обоснование подключений <span class="status ok">готово</span></h3>
+    <p>Зачем каждое подключение и какой шаг работы оно улучшило — <a href="connections.md">report/connections.md</a>.</p>
+  </article>
+</section>
+
+<!-- ============================ Б ============================ -->
+<section class="block" id="skill">
+  <div class="block-head"><h2>Б. Свой skill: metro-balance-check</h2></div>
+
+  <article class="card">
+    <h3>Устройство и автоматизация <span class="status ok">готово</span></h3>
+    <p><span class="label">Проблема.</span> Юнит-тесты ловят сломанные правила, но не сломанный баланс: если сузить окно
+      идеального переключения передач, все тесты зелёные, а бонус в игре перестаёт срабатывать.</p>
+    <p><span class="label">Решение.</span> Скилл сравнивает игру из последнего коммита и текущий код на одних и тех же
+      30 трассах (автопилот) и выводит таблицу из 6 метрик с изменениями. Старая версия берётся из git автоматически —
+      ничего не откатывается.</p>
+<pre>.agents/skills/metro-balance-check/
+├── SKILL.md            ← когда применять, 5 шагов, пороги «заметно», формат отчёта
+└── scripts/balance.js  ← сравнение HEAD → текущий код</pre>
+    <ul class="files">
+      <li><a href="../.agents/skills/metro-balance-check/SKILL.md">SKILL.md</a></li>
+      <li><a href="../.agents/skills/metro-balance-check/scripts/balance.js">scripts/balance.js</a></li>
+    </ul>
+    <p><span class="label">Процедура:</span> check.sh зелёный → <code>balance.js</code> → интерпретация по порогам →
+      подтверждение причины на конкретном заезде через MCP <code>simulate_run</code> → короткий отчёт (константы сам не меняет).</p>
+    <details class="evidence">
+      <summary>Проверка вручную: окно идеального переключения 0.82 → 0.95</summary>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Метрика</th><th>до</th><th>после</th><th>изменение</th></tr></thead>
+        <tbody>
+          <tr><td>Средняя дистанция (бот), м</td><td>837</td><td>829</td><td>−1%</td></tr>
+          <tr><td>Средние очки (бот)</td><td>3685</td><td>2764</td><td><b>−25%</b></td></tr>
+          <tr><td>Аварий бота, %</td><td>26.7</td><td>26.7</td><td>0</td></tr>
+          <tr><td>Доля идеальных переключений, %</td><td>50.0</td><td>0.0</td><td><b>−100%</b></td></tr>
+          <tr><td>Средняя макс. скорость, км/ч</td><td>204</td><td>204</td><td>0</td></tr>
+          <tr><td>Без управления до аварии, с</td><td>14.8</td><td>14.8</td><td>0</td></tr>
+        </tbody>
+      </table></div>
+      <p class="note">Вывод верный: правка сделала бонус недостижимым, а на скорость и сложность не повлияла.</p>
+    </details>
+  </article>
+
+  <article class="card">
+    <h3>Запуск агентом и проверенный результат <span class="status ok">готово</span></h3>
+    <p class="prompt"><b>Демо · свой skill</b>«Загрузи skill metro-balance-check. Измени в game.js константу BASE_ACCEL с 9 на 12, затем проверь, как это повлияло на баланс, строго по процедуре скилла. Не коммить.»</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Время</th><th>Что сделал агент</th></tr></thead>
+      <tbody>
+        <tr><td>08:50</td><td>загрузил skill <code>metro-balance-check</code>; шаг 1 процедуры — <code>check.sh</code> зелёный</td></tr>
+        <tr><td>08:51</td><td>поменял <code>BASE_ACCEL</code> 9 → 12 — <b>hook: FAIL</b>: упал тест <code>mcp/test_simulate.js</code></td></tr>
+        <tr><td>08:52–08:54</td><td>разобрал причину: в тесте время переключения <code>t=1.1</code> подобрано под ускорение 9, при 12 машина к этому моменту уже на отсечке («late» вместо «perfect»); проверил через <code>simulate_run</code> и скрипт</td></tr>
+        <tr><td>08:54</td><td><b>не стал подгонять тест</b> (AGENTS.md и правило 5 style guide запрещают) — спросил меня; я ответила: это временный эксперимент, тест не трогать, баланс замерить</td></tr>
+        <tr><td>08:57</td><td>запустил <code>balance.js</code>, интерпретировал таблицу по порогам SKILL.md, подтвердил причину на seed 42</td></tr>
+        <tr><td>08:57</td><td>вернул <code>BASE_ACCEL</code> на 9 — <b>hook: PASS</b>; <code>check.sh</code> → <code>CHECK: PASS</code></td></tr>
+      </tbody>
+    </table></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Метрика</th><th>HEAD (9)</th><th>сейчас (12)</th><th>изменение</th><th>порог</th><th>заметно?</th></tr></thead>
+      <tbody>
+        <tr><td>Средняя дистанция (бот), м</td><td>837</td><td>848</td><td>+1%</td><td>±15%</td><td>нет</td></tr>
+        <tr><td>Средние очки (бот)</td><td>3685</td><td>3136</td><td>−15%</td><td>±20%</td><td>нет (у границы)</td></tr>
+        <tr><td>Аварий бота, %</td><td>26.7</td><td>26.7</td><td>0 п.п.</td><td>±10 п.п.</td><td>нет</td></tr>
+        <tr><td>Доля идеальных переключений, %</td><td>50.0</td><td>25.0</td><td><b>−25 п.п.</b></td><td>±15 п.п.</td><td><b>да</b></td></tr>
+        <tr><td>Средняя макс. скорость, км/ч</td><td>204</td><td>204</td><td>0%</td><td>±10%</td><td>нет</td></tr>
+        <tr><td>Без управления до аварии, с</td><td>14.8</td><td>14.7</td><td>−1%</td><td>±20%</td><td>нет</td></tr>
+      </tbody>
+    </table></div>
+    <p><span class="label">Вывод скилла:</span> ускорение 9 → 12 сокращает разгон, и автопилот чаще проскакивает окно идеального
+      переключения — таких переключений вдвое меньше (50% → 25%), вместе с ними пропадают бусты и бонусы, поэтому очки −15%
+      при той же дистанции, авариях и скорости. Тревожных сигналов нет. Пример на seed 42: при 9 — 2 perfect и 2 good,
+      при 12 — 1 perfect и 3 good.</p>
+    <p class="note">Наблюдение агента: MCP-сервер держит <code>game.js</code>, загруженный при старте сессии, поэтому новую
+      константу он «не видит» — сравнение «после» агент сделал напрямую через <code>mcp/simulate.js</code>. Это ограничение
+      моего MCP: после правки логики сервер нужно перезапускать.</p>
+    <figure class="shot"><img src="img/demo7-1-skill-edit.jpg" alt="Агент загружает skill metro-balance-check, проверяет тесты и меняет BASE_ACCEL" loading="lazy">
+      <figcaption>Загрузка скилла, шаг 1 (тесты зелёные), правка константы</figcaption></figure>
+    <figure class="shot"><img src="img/demo7-2-hook-fail.jpg" alt="Hook поймал упавший тест, агент разбирает причину" loading="lazy">
+      <figcaption>Hook поймал красный тест — агент разбирает причину, а не правит тест</figcaption></figure>
+    <figure class="shot"><img src="img/demo7-3-balance.jpg" alt="Ответ на вопрос агента и запуск скрипта balance.js" loading="lazy">
+      <figcaption>Моё решение на вопрос агента и запуск скрипта скилла</figcaption></figure>
+    <figure class="shot"><img src="img/demo7-4-result.jpg" alt="Итоговая таблица баланса, вывод и откат константы" loading="lazy">
+      <figcaption>Итог: таблица с порогами, вывод, откат на 9 и CHECK: PASS</figcaption></figure>
+  </article>
+</section>
+
+<!-- ============================ В ============================ -->
+<section class="block" id="mcp">
+  <div class="block-head"><h2>В. Свой MCP: metro-rush</h2></div>
+
+  <article class="card">
+    <h3>Полезный tool: simulate_run <span class="status ok">готово</span></h3>
+    <p>Прогоняет заезд на настоящей логике <code>game.js</code> без браузера и возвращает итог. Одинаковый seed —
+      одинаковая трасса, поэтому результат воспроизводим. Агент может проверить логику, баланс передач или проходимость
+      трассы, не запуская игру.</p>
+    <div class="table-wrap"><table>
+      <tbody>
+        <tr><th>Вход</th><td><code>seed</code> (трасса), <code>seconds</code> (до 120), <code>actions</code> — команды по времени, <code>autopilot</code></td></tr>
+        <tr><th>Выход</th><td>доехал / разбился (обо что, на какой секунде), дистанция, очки, монеты, скорость, все переключения с оценкой perfect / early / late</td></tr>
+        <tr><th>Ошибочный вход</th><td>не падает, возвращает <code>isError</code> с понятным текстом; неизвестную команду отклоняет та же валидация, что в фиче A</td></tr>
+        <tr><th>Тесты</th><td>8 тестов ядра + 4 теста по настоящему протоколу MCP (клиент запускает сервер, как OpenCode)</td></tr>
+      </tbody>
+    </table></div>
+    <ul class="files">
+      <li><a href="../mcp/server.mjs">mcp/server.mjs</a> — MCP-сервер на официальном SDK</li>
+      <li><a href="../mcp/simulate.js">mcp/simulate.js</a> — ядро симуляции и валидация входа</li>
+      <li><a href="../mcp/test_simulate.js">mcp/test_simulate.js</a>, <a href="../mcp/test_server.mjs">mcp/test_server.mjs</a> — тесты</li>
+      <li><a href="../opencode.json">opencode.json</a> — подключение <code>"metro-rush": { "command": ["node", "mcp/server.mjs"] }</code></li>
+    </ul>
+  </article>
+
+  <article class="card">
+    <h3>Реальный вызов: успешный и ошибочный вход <span class="status ok">готово</span></h3>
+    <p class="prompt"><b>Демо · успешный вызов</b>«Первым действием вызови инструмент simulate_run из MCP metro-rush с параметрами: seed 42, seconds 30, autopilot true. Ответь, доехала ли машина, сколько проехала и как переключались передачи. Ничего не меняй.»</p>
+<pre>metro-rush_simulate_run  {"seed": 42, "seconds": 30, "autopilot": true}
+→ "finished": "time", "crash": null, "distance": 949.92, "score": 3936,
+  "coins": 58, "final_gear": 5, "max_kmh": 204, …</pre>
+    <p>Агент: доехала без аварии, 950 м, 3936 очков, 58 монет; 4 переключения до 5-й передачи за 3,3 с —
+      2 perfect и 2 good, без ранних, поздних и перекрутов.</p>
+    <figure class="shot"><img src="img/demo5-simulate-ok.jpg" alt="Агент вызывает simulate_run с seed 42 и описывает результат заезда" loading="lazy">
+      <figcaption>Демо 5 — успешный вызов (07.10 08:49)</figcaption></figure>
+
+    <p class="prompt"><b>Демо · ошибочный вход</b>«Первым действием вызови инструмент simulate_run из MCP metro-rush с параметрами: seed 42, seconds 10, actions [{"t": 1, "cmd": "turbo"}]. Покажи, что вернул инструмент. Ничего не меняй.»</p>
+<pre>metro-rush_simulate_run  {"seed": 42, "seconds": 10, "actions": [{"t": 1, "cmd": "turbo"}]}
+→ isError: Ошибка входа (RangeError): actions[0].cmd: unknown command: "turbo"</pre>
+    <p>Заезд не запускался: вход отклонён проверкой до симуляции — той же <code>validateCommand()</code>, что в фиче A.
+      Ответ указывает, какое поле неверно (<code>actions[0].cmd</code>) и почему; сервер продолжает работать
+      (это же проверяет тест <code>test_server.mjs</code>).</p>
+    <figure class="shot"><img src="img/demo6-simulate-error.jpg" alt="Инструмент simulate_run возвращает ошибку входа на команду turbo" loading="lazy">
+      <figcaption>Демо 6 — ошибочный вход (07.10 09:02)</figcaption></figure>
+  </article>
+</section>
+
+<!-- ============================ Г ============================ -->
+<section class="block" id="reflection">
+  <div class="block-head"><h2>Г. Рефлексия</h2></div>
+  <article class="card">
+    <p>Что помогло, что мешало и где пришлось вмешаться — <a href="reflection.md">report/reflection.md</a>.</p>
+  </article>
+</section>
+
+<!-- ============================ Практика ============================ -->
+<section class="block" id="practice">
+  <div class="block-head"><h2>Ход практики</h2><span class="points">этапы 1–6</span></div>
+
+  <article class="card">
+    <h3>Фичи A и B</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th></th><th>A: входная валидация</th><th>B: сбой зависимости</th></tr></thead>
+      <tbody>
+        <tr><th>Суть</th><td>неизвестная команда отклоняется громкой ошибкой и не меняет игру</td>
+            <td>если браузер не дал звук — ждём ≤ 2 с, понятное сообщение и значок «Звук выкл», игра не ждёт звук</td></tr>
+        <tr><th>Где</th><td><code>validateCommand()</code> в <a href="../game.js">game.js</a></td>
+            <td><code>initSound()</code> в <a href="../audio.js">audio.js</a>, тесты <a href="../test_audio.js">test_audio.js</a></td></tr>
+        <tr><th>Коммит</th><td><code>4391fdf</code></td><td><code>2ea59b4</code></td></tr>
+      </tbody>
+    </table></div>
+    <p>Контракт обеих фич — <a href="../docs/requirements.md">docs/requirements.md</a>.</p>
+  </article>
+
+  <article class="card">
+    <h3>B отдельно: worktree, ревью, слияние</h3>
+    <ul>
+      <li>A и настройки закоммичены, затем <code>git worktree add -b practice-04-b ../ITMOv2-p4-b HEAD</code>;
+        в копии заново создан <code>venv</code>, <code>opencode.json</code> пришлось добавить в git принудительно
+        (его скрывал локальный <code>.git/info/exclude</code>).</li>
+      <li>B реализовал агент в новом чате по контракту, со skill test-driven-development.</li>
+      <li>Ревью субагентом <code>@explore</code>: заметил отсутствие значка «звук выключен», но счёл его некритичным.
+        Повторное ревью не выполнилось — в этот момент кончился лимит ключа (<code>402</code>).</li>
+      <li>Дополнительная проверка diff нашла ещё три проблемы: два звуковых контекста вместо одного, незащищённый
+        <code>setEngine</code> (мог остановить игровой цикл), двойной лог. Решение — исправить все, агентом в том же чате;
+        повторный запуск звука без лимита на следующем заезде принят как известное ограничение.</li>
+      <li><code>git diff --check</code> перед коммитом нашёл ~100 строк с лишними пробелами от агента — убраны.</li>
+      <li>Слияние <code>git merge --ff-only practice-04-b</code>, проверка объединённого состояния — <code>CHECK: PASS</code>.</li>
+    </ul>
+  </article>
+
+  <article class="card">
+    <h3>Передача контекста</h3>
+    <p><a href="../docs/HANDOFF.md">docs/HANDOFF.md</a> — состояние, источники, проверки и ограничения для новой сессии.</p>
+  </article>
+</section>
+
+<footer>
+  <p>Проверить проект: <code>sh scripts/check.sh</code> (или <code>--full</code> с браузером) →
+    <code>CHECK: PASS</code>. MCP: <code>opencode mcp list</code>. Skills: <code>opencode debug skill</code>.</p>
+  <p>Ссылки на файлы открываются, если страница открыта из папки проекта (<code>practices/practice_04/report/index.html</code>).</p>
+</footer>
+
+</main>
+</body>
+</html>
