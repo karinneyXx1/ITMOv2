@@ -34,21 +34,47 @@
 
 ## Взаимодействие компонентов
 
-1. Игрок нажимает «Купить» или «Выбрать» в разделе «Внешний вид» гаража.
-2. `main.js` вызывает в `game.js` `buyCosmetic(garage, id)` или
-   `selectCosmetic(garage, id)` внутри `try/catch`.
-3. `game.js` проверяет вход и правила и возвращает новый гараж или бросает
-   `TypeError`/`RangeError` с текстом из спеки.
-4. При успехе `main.js` сохраняет гараж через `saveGarage` в `localStorage` и
-   перерисовывает экран; при ошибке показывает её текст в `role="status"`.
-5. При старте заезда (и сразу после выбора) `main.js` получает из `game.js`
-   описание внешнего вида `carLook(garage)` — цвета выбранной краски и id наклейки —
-   и передаёт его в рендер через `renderer.setCarLook(look)`.
-6. Каждый кадр `render.js` рисует машину в `drawPlayer` по сохранённому `look`;
-   `world` и `step` о косметике не знают.
-7. При загрузке страницы `main.js` читает `localStorage`, `parseGarage` разбирает
-   кошелёк, уровни и косметику; при проблемах с косметикой берётся умолчание,
-   кошелёк и уровни сохраняются.
+```mermaid
+sequenceDiagram
+    actor P as Игрок
+    participant UI as main.js (гараж, HUD)
+    participant Logic as game.js (правила)
+    participant Store as localStorage
+    participant Render as render.js
+
+    Note over UI,Store: Загрузка страницы
+    UI->>Store: читает ключ metro-rush-garage
+    Store-->>UI: JSON или ничего
+    UI->>Logic: parseGarage(raw)
+    Logic-->>UI: гараж (нет или испорчена косметика → умолчание, кошелёк и уровни целы)
+
+    Note over P,Render: Покупка или выбор в разделе «Внешний вид»
+    P->>UI: «Купить» / «Выбрать»
+    UI->>Logic: buyCosmetic(garage, id) / selectCosmetic(garage, id)
+    alt правила выполнены
+        Logic-->>UI: новый гараж
+        UI->>Store: saveGarage(garage)
+        UI->>Logic: carLook(garage)
+        Logic-->>UI: look: цвета краски и id наклейки
+        UI->>Render: setCarLook(look)
+        UI-->>P: экран гаража перерисован
+    else нет монет / уже куплено / не куплено / неизвестная вещь
+        Logic-->>UI: TypeError или RangeError
+        UI-->>P: текст ошибки в role=status
+    end
+
+    Note over UI,Render: Заезд
+    UI->>Logic: carLook(garage) в start()
+    UI->>Render: setCarLook(look)
+    loop каждый кадр
+        UI->>Logic: step(world, dt, input, rng)
+        UI->>Render: draw(world, clock, dt)
+        Render->>Render: drawPlayer рисует машину по look
+    end
+```
+
+Косметика не попадает в `world`: `step` и симуляция о ней не знают, поэтому MCP
+и тесты логики не меняются. При ошибке гараж не меняется и не сохраняется.
 
 ## Decisions
 
