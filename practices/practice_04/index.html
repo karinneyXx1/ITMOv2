@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="ru">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Metro Rush</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Rubik:wght@500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+  <canvas id="game" aria-label="Игровое поле Metro Rush"></canvas>
+
+  <!-- HUD поверх игры -->
+  <div id="hud" class="hud" hidden>
+    <div class="hud-score">
+      <div id="hud-score" class="score graffiti-text" data-text="0">0</div>
+      <div id="hud-mult" class="mult">×1</div>
+    </div>
+
+    <div class="hud-meta">
+      <div class="coins"><span class="coin-icon" aria-hidden="true"></span><span id="hud-coins">0</span></div>
+      <div class="best">Рекорд <b id="hud-best">0</b></div>
+      <div id="hud-magnet" class="chip chip-magnet" hidden>Магнит <b id="hud-magnet-time">0</b></div>
+      <div id="hud-sound-off" class="chip chip-sound-off" hidden>Звук выкл</div>
+    </div>
+
+    <div class="dash" aria-label="Приборная панель">
+      <div class="shift-lights" id="shift-lights" aria-hidden="true">
+        <span></span><span></span><span></span><span></span><span></span>
+      </div>
+      <div class="tacho-wrap">
+        <svg class="tacho" viewBox="0 0 200 200" aria-hidden="true">
+          <path id="tacho-track" class="tacho-track" />
+          <path id="tacho-perfect" class="tacho-perfect" />
+          <path id="tacho-red" class="tacho-red" />
+          <g id="tacho-ticks"></g>
+          <path id="tacho-fill" class="tacho-fill" />
+          <g id="tacho-needle" class="tacho-needle">
+            <line x1="100" y1="58" x2="100" y2="30" />
+          </g>
+        </svg>
+        <div class="gear-box">
+          <div id="hud-gear" class="gear graffiti-text" data-text="1">1</div>
+        </div>
+      </div>
+      <div class="speed"><b id="hud-speed">0</b> км/ч</div>
+      <div class="nitro" title="Нитро: копится от монет, жми N">
+        <div class="nitro-bar"><div id="hud-nitro" class="nitro-fill"></div></div>
+        <kbd>N</kbd>
+      </div>
+    </div>
+
+    <div id="toast" class="toast" aria-live="polite"></div>
+  </div>
+
+  <!-- Плашка статуса звука -->
+  <div id="sound-status" class="sound-status" role="status" hidden></div>
+
+  <!-- Стартовый экран -->
+  <section id="menu" class="screen menu">
+    <div class="title-block">
+      <div class="bubbles" aria-hidden="true">
+        <i style="--x:2%;--y:38%;--s:22%"></i>
+        <i style="--x:14%;--y:4%;--s:20%"></i>
+        <i style="--x:30%;--y:-6%;--s:24%"></i>
+        <i style="--x:52%;--y:-4%;--s:21%"></i>
+        <i style="--x:70%;--y:6%;--s:23%"></i>
+        <i style="--x:82%;--y:36%;--s:19%"></i>
+        <i style="--x:68%;--y:60%;--s:24%"></i>
+        <i style="--x:44%;--y:66%;--s:22%"></i>
+        <i style="--x:20%;--y:62%;--s:23%"></i>
+        <i style="--x:-2%;--y:8%;--s:9%"></i>
+        <i style="--x:94%;--y:76%;--s:10%"></i>
+        <b class="spark" style="--x:6%;--y:24%"></b>
+        <b class="spark" style="--x:88%;--y:14%"></b>
+        <b class="spark" style="--x:78%;--y:84%"></b>
+      </div>
+      <h1 class="title">
+        <span class="title-word small graffiti-text" data-text="METRO">METRO</span>
+        <span class="title-word big graffiti-text" data-text="RUSH">RUSH</span>
+      </h1>
+    </div>
+
+    <p class="tagline">Гони по путям метро, щёлкай передачи на отсечке и собирай монеты.</p>
+
+    <ul class="controls" aria-label="Управление">
+      <li><span class="keys"><kbd>←</kbd><kbd>→</kbd></span> сменить путь</li>
+      <li><span class="keys"><kbd>↑</kbd><kbd>Пробел</kbd></span> прыжок</li>
+      <li><span class="keys"><kbd>E</kbd><kbd>Shift</kbd></span> передача вверх</li>
+      <li><span class="keys"><kbd>Q</kbd><kbd>Ctrl</kbd></span> передача вниз</li>
+      <li><span class="keys"><kbd>↓</kbd></span> тормоз</li>
+      <li><span class="keys"><kbd>N</kbd></span> нитро</li>
+    </ul>
+
+    <p class="tip">Переключайся, когда загорелись все зелёные огни — это идеальное переключение: буст и бонусные очки.</p>
+
+    <button id="start" class="btn-pill">Поехали <kbd>Enter</kbd></button>
+    <p class="menu-best">Рекорд: <b id="menu-best">0</b></p>
+    <p class="menu-hint">
+      <span><kbd>F</kbd> полный экран</span>
+      <span><kbd>M</kbd> звук</span>
+      <span><kbd>Esc</kbd> пауза</span>
+    </p>
+  </section>
+
+  <!-- Пауза -->
+  <section id="pause" class="screen dim" hidden>
+    <div class="card">
+      <h2 class="card-title">Пауза</h2>
+      <button id="resume" class="btn-pill">Продолжить <kbd>Esc</kbd></button>
+      <button id="to-menu" class="btn-ghost">В меню</button>
+    </div>
+  </section>
+
+  <!-- Конец заезда -->
+  <section id="over" class="screen dim" hidden>
+    <div class="card">
+      <div id="new-record" class="sticker" hidden>Новый рекорд!</div>
+      <h2 class="card-title">Заезд окончен</h2>
+      <div class="final-score graffiti-text" id="over-score" data-text="0">0</div>
+      <dl class="stats">
+        <div><dt>Дистанция</dt><dd id="over-distance">0 м</dd></div>
+        <div><dt>Монеты</dt><dd id="over-coins">0</dd></div>
+        <div><dt>Идеальные переключения</dt><dd id="over-perfect">0</dd></div>
+        <div><dt>Макс. скорость</dt><dd id="over-speed">0 км/ч</dd></div>
+      </dl>
+      <button id="restart" class="btn-pill">Ещё заезд <kbd>Enter</kbd></button>
+    </div>
+  </section>
+
+  <!-- Кнопки для тач-экранов -->
+  <div class="touch" id="touch" hidden>
+    <button data-cmd="gearDown" aria-label="Передача вниз">−</button>
+    <button data-cmd="nitro" aria-label="Нитро">N</button>
+    <button data-cmd="gearUp" aria-label="Передача вверх">+</button>
+  </div>
+
+  <script src="game.js"></script>
+  <script src="render.js"></script>
+  <script src="audio.js"></script>
+  <script src="main.js"></script>
+</body>
+
+</html>

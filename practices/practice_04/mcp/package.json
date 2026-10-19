@@ -1,0 +1,14 @@
+{
+  "name": "metro-rush-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MCP-сервер Metro Rush: инструмент simulate_run прогоняет заезд на логике game.js",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node test_simulate.js && node test_server.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.31.0",
+    "zod": "^4.6.5"
+  }
+}
