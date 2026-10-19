@@ -100,7 +100,11 @@
     <p class="tip">Переключайся, когда загорелись все зелёные огни — это идеальное переключение: буст и бонусные очки.</p>
 
     <button id="start" class="btn-pill">Поехали <kbd>Enter</kbd></button>
-    <button id="menu-garage" class="btn-ghost">Гараж</button>
+    <div class="menu-row">
+      <button id="menu-garage" class="btn-ghost">Гараж</button>
+      <button id="menu-missions" class="btn-ghost btn-missions">Задания <span data-missions-count>0/3</span><span class="badge" data-missions-badge hidden></span></button>
+    </div>
+    <p id="menu-status" class="menu-status" role="status" aria-live="polite"></p>
     <p class="menu-best">Рекорд: <b id="menu-best">0</b></p>
     <p class="menu-hint">
       <span><kbd>F</kbd> полный экран</span>
@@ -131,8 +135,16 @@
         <div><dt>Макс. скорость</dt><dd id="over-speed">0 км/ч</dd></div>
       </dl>
       <p id="over-earned" class="earned">+0 в гараж</p>
+      <div id="over-missions" class="over-missions" hidden>
+        <h3>Задания дня</h3>
+        <ul></ul>
+        <p class="om-note"></p>
+      </div>
       <button id="restart" class="btn-pill">Ещё заезд <kbd>Enter</kbd></button>
-      <button id="over-garage" class="btn-ghost">Гараж</button>
+      <div class="menu-row">
+        <button id="over-garage" class="btn-ghost">Гараж</button>
+        <button id="over-missions-open" class="btn-ghost btn-missions">Задания <span data-missions-count>0/3</span><span class="badge" data-missions-badge hidden></span></button>
+      </div>
     </div>
   </section>
 
@@ -147,6 +159,22 @@
       <p id="garage-status" class="garage-status" role="status"></p>
       <p class="garage-note">Улучшения действуют со следующего заезда.</p>
       <button id="garage-back" class="btn-ghost">Назад <kbd>Esc</kbd></button>
+    </div>
+  </section>
+
+  <!-- Ежедневные задания (specs/003-daily-missions) -->
+  <section id="missions" class="screen dim" hidden>
+    <div class="card missions-card" tabindex="-1" role="region" aria-labelledby="missions-title">
+      <h2 id="missions-title" class="card-title">Задания дня</h2>
+      <div id="missions-done" class="missions-done" hidden>Все задания на сегодня выполнены!</div>
+      <div class="coins garage-wallet" aria-label="Монеты в кошельке гаража">
+        <span class="coin-icon" aria-hidden="true"></span><span id="missions-coins">0</span>
+      </div>
+      <ul id="missions-list" class="missions-list"></ul>
+      <p id="missions-unavailable" class="missions-unavailable" hidden>Задания сейчас недоступны. Заезды и гараж работают как обычно.</p>
+      <p id="missions-status" class="garage-status" role="status" aria-live="polite"></p>
+      <p id="missions-timer" class="garage-note"></p>
+      <button id="missions-back" class="btn-ghost">Назад <kbd>Esc</kbd></button>
     </div>
   </section>
 

@@ -5,6 +5,8 @@
 (function () {
   const BEST_KEY = "metro-rush-best";
   const GARAGE_KEY = "metro-rush-garage";
+  const MISSIONS_KEY = "metro-rush-missions";
+  const TOAST_TIME = 0.9; // длительность всплывающей надписи (как анимация .toast.show)
   const MAX_DT = 0.05; // защита от скачков dt после сворачивания вкладки
   const DISPLAY_RPM_MAX = 1.1;
 
@@ -48,10 +50,20 @@
     garageList: $("garage-list"),
     garageStatus: $("garage-status"),
     hudUpgrades: $("hud-upgrades"),
+    menuStatus: $("menu-status"),
+    missions: $("missions"),
+    missionsCard: document.querySelector(".missions-card"),
+    missionsCoins: $("missions-coins"),
+    missionsList: $("missions-list"),
+    missionsStatus: $("missions-status"),
+    missionsTimer: $("missions-timer"),
+    missionsDone: $("missions-done"),
+    missionsUnavailable: $("missions-unavailable"),
+    overMissions: $("over-missions"),
     touch: $("touch"),
   };
 
-  // mode: menu | playing | paused | crashing | over | garage
+  // mode: menu | playing | paused | crashing | over | garage | missions
   let mode = "menu";
   let world = createWorld();
   let rng = createRng(Date.now() & 0x7fffffff);
@@ -59,6 +71,17 @@
   let garage = loadGarage();
   let runCredited = true; // монеты текущего заезда уже в кошельке (до первого старта — нечего зачислять)
   let garageFrom = "menu"; // экран, на который вернёт Esc из гаража
+  // Ежедневные задания (specs/003-daily-missions, контракт specs/daily-missions-contract.md)
+  let nowOffset = 0; // сдвиг «сейчас» для тестов (window.__metro.setNow)
+  const now = () => Date.now() + nowOffset;
+  let missions = null;
+  let missionsOk = true; // false — «Задания сейчас недоступны», остальная игра работает
+  let missionsFrom = "menu";
+  let lastRun = null; // результат applyRunToMissions последнего заезда (для экрана итогов)
+  let announced = new Set(); // задания, о выполнении которых уже сказали в этом заезде
+  let toastUntil = 0; // до какого момента clock показывается текущая надпись
+  const toastQueue = [];
+  let saveWarned = false;
   let lastTimestamp = null;
   let clock = 0;
   let crashTimer = 0;
@@ -109,7 +132,47 @@
     const earned = world.coins;
     garage = creditCoins(garage, earned);
     saveGarage(garage);
+    lastRun = null;
+    if (missionsOk) {
+      try {
+        lastRun = applyRunToMissions(missions, garage, runResultsFromWorld(world), dayKey(now()));
+        missions = lastRun.state;
+        garage = lastRun.garage;
+        persistMissions();
+      } catch (err) {
+        console.error("Задания: не удалось учесть заезд:", err);
+        missionsOk = false;
+      }
+    }
     return earned;
+  }
+
+  // ---------- ежедневные задания: хранение ----------
+
+  function loadMissions(day) {
+    try {
+      return parseMissions(localStorage.getItem(MISSIONS_KEY), day);
+    } catch {
+      return createDailyMissions(day); // хранилище недоступно
+    }
+  }
+
+  function saveMissions(state) {
+    try {
+      localStorage.setItem(MISSIONS_KEY, JSON.stringify(state));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  // Сохраняет кошелёк, затем задания (порядок не даёт потерять монеты).
+  function persistMissions() {
+    saveGarage(garage);
+    if (!saveMissions(missions) && !saveWarned) {
+      saveWarned = true;
+      showSoundStatus("Прогресс заданий не сохранится после перезагрузки");
+    }
   }
 
   // ---------- тахометр ----------
@@ -170,6 +233,7 @@
   }
 
   function showToast(text, tone) {
+    toastUntil = clock + TOAST_TIME;
     ui.toast.textContent = text;
     ui.toast.className = `toast ${tone || ""}`;
     void ui.toast.offsetWidth; // перезапуск CSS-анимации
@@ -287,7 +351,256 @@
     ui.pause.hidden = screen !== "pause";
     ui.over.hidden = screen !== "over";
     ui.garage.hidden = screen !== "garage";
-    ui.hud.hidden = screen === "menu" || screen === "garage";
+    ui.missions.hidden = screen !== "missions";
+    ui.hud.hidden = screen === "menu" || screen === "garage" || screen === "missions";
+  }
+
+  // ---------- ежедневные задания: экран, кнопки, итоги ----------
+
+  const fmtNum = (n) => n.toLocaleString("ru-RU");
+  const MISSION_TEXT = {
+    coins: { title: (t) => `Собери ${fmtNum(t)} монет`, unit: "монет" },
+    perfectShifts: { title: (t) => `Сделай ${t} идеальных переключений`, unit: "переключений" },
+    distance: { title: (t) => `Проедь ${fmtNum(t)} м`, unit: "м" },
+  };
+  const GENERIC_CLAIM_ERROR = "Не удалось забрать награду. Попробуй ещё раз.";
+
+  function missionStateLabel(m) {
+    if (m.claimed) return "Получено";
+    if (m.completed) return "Выполнено — забери награду";
+    return m.progress > 0 ? "В процессе" : "Не начато";
+  }
+
+  function setMissionsStatus(text, tone) {
+    ui.missionsStatus.textContent = text;
+    ui.missionsStatus.className = `garage-status ${tone || ""}`;
+  }
+
+  // Кнопки «Задания» в меню и на экране итогов: «Задания N/3» + отметка.
+  function renderMissionsButtons() {
+    let count = "—";
+    let badge = "";
+    if (missionsOk) {
+      const list = describeMissions(missions);
+      count = `${list.filter((m) => m.completed).length}/${list.length}`;
+      if (list.some((m) => m.completed && !m.claimed)) badge = "Награда!";
+      else if (!missions.seen) badge = "Новые!";
+    }
+    for (const el of document.querySelectorAll("[data-missions-count]")) el.textContent = count;
+    for (const el of document.querySelectorAll("[data-missions-badge]")) {
+      el.textContent = badge;
+      el.hidden = !badge;
+    }
+  }
+
+  function missionsTimerText() {
+    const left = nextDayStart(now()) - now();
+    if (left < 60000) return "Новые задания меньше чем через минуту";
+    const h = Math.floor(left / 3600000);
+    const min = Math.floor((left % 3600000) / 60000);
+    return h > 0 ? `Новые задания через ${h} ч ${String(min).padStart(2, "0")} мин` : `Новые задания через ${min} мин`;
+  }
+
+  function missionRow(m) {
+    const text = MISSION_TEXT[m.type];
+    const title = text ? text.title(m.target) : m.type;
+    const progress = Math.min(Math.max(m.progress, 0), m.target);
+    const row = document.createElement("li");
+    row.className = "mission";
+    row.dataset.id = m.id;
+    row.dataset.state = m.claimed ? "claimed" : m.completed ? "ready" : progress > 0 ? "progress" : "new";
+
+    const head = document.createElement("div");
+    head.className = "mission-head";
+    const name = document.createElement("b");
+    name.textContent = title;
+    const label = document.createElement("span");
+    label.className = "mission-state";
+    label.textContent = missionStateLabel(m);
+    head.append(name, label);
+
+    const bar = document.createElement("div");
+    bar.className = "mission-bar";
+    bar.setAttribute("role", "progressbar");
+    bar.setAttribute("aria-valuemin", "0");
+    bar.setAttribute("aria-valuemax", String(m.target));
+    bar.setAttribute("aria-valuenow", String(progress));
+    bar.setAttribute("aria-valuetext", `${progress} из ${m.target} ${text ? text.unit : ""}`.trim());
+    const fill = document.createElement("div");
+    fill.className = "mission-fill";
+    fill.style.width = `${Math.round((progress / m.target) * 100)}%`;
+    bar.append(fill);
+
+    const foot = document.createElement("div");
+    foot.className = "mission-foot";
+    const nums = document.createElement("span");
+    nums.className = "mission-nums";
+    nums.textContent = `${fmtNum(progress)} / ${fmtNum(m.target)}`;
+    foot.append(nums);
+    if (m.completed && !m.claimed) {
+      const btn = document.createElement("button");
+      btn.className = "btn-buy";
+      btn.dataset.claim = m.id;
+      btn.innerHTML = `Забрать +${m.reward}<span class="coin-icon" aria-hidden="true"></span>`;
+      btn.setAttribute("aria-label", `Забрать награду ${m.reward} монет за задание: ${title}`);
+      foot.append(btn);
+    } else {
+      const reward = document.createElement("span");
+      reward.className = "mission-reward";
+      reward.innerHTML = m.claimed ? "✓ Получено" : `+${m.reward}<span class="coin-icon" aria-hidden="true"></span>`;
+      foot.append(reward);
+    }
+    row.append(head, bar, foot);
+    return row;
+  }
+
+  function renderMissions() {
+    ui.missionsCoins.textContent = String(garage.coins);
+    ui.missionsUnavailable.hidden = missionsOk;
+    ui.missionsList.hidden = !missionsOk;
+    ui.missionsTimer.hidden = !missionsOk;
+    if (!missionsOk) {
+      ui.missionsDone.hidden = true;
+      return;
+    }
+    try {
+      const list = describeMissions(missions);
+      ui.missionsList.replaceChildren(...list.map(missionRow));
+      ui.missionsDone.hidden = !list.every((m) => m.claimed);
+      ui.missionsTimer.textContent = missionsTimerText();
+    } catch (err) {
+      console.error("Задания: не удалось показать:", err);
+      missionsOk = false;
+      renderMissions();
+    }
+  }
+
+  // Актуализация дня (контракт, раздел 5): при загрузке, в меню, на экране «Заданий».
+  function refreshMissionsDay() {
+    if (!missionsOk) return null;
+    let r;
+    try {
+      r = ensureMissionDay(missions, garage, dayKey(now()));
+    } catch (err) {
+      console.error("Задания: не удалось проверить день:", err);
+      missionsOk = false;
+      renderMissionsButtons();
+      return null;
+    }
+    if (r.dayChanged) {
+      missions = r.state;
+      garage = r.garage;
+      persistMissions();
+      const credit = r.autoCredited > 0 ? `Вчерашние награды: +${r.autoCredited} монет в гараж` : "";
+      if (mode === "missions") {
+        setMissionsStatus(["Наступил новый день — задания обновлены", credit].filter(Boolean).join(". "), "good");
+        renderMissions();
+      } else if (mode === "menu" && credit) {
+        ui.menuStatus.textContent = credit;
+      }
+    }
+    renderMissionsButtons();
+    return r;
+  }
+
+  function renderOverMissions(run) {
+    ui.overMissions.hidden = !missionsOk || !run;
+    if (ui.overMissions.hidden) return;
+    const list = describeMissions(run.state);
+    const rows = list.map((m) => {
+      const li = document.createElement("li");
+      const gain = run.gains[m.id] || 0;
+      const text = MISSION_TEXT[m.type];
+      li.innerHTML = `<span class="om-title"></span><span class="om-nums"></span>`;
+      li.querySelector(".om-title").textContent = text ? text.title(m.target) : m.type;
+      const extra = `${gain > 0 ? ` (+${fmtNum(gain)})` : ""}${run.completed.includes(m.id) ? " · Выполнено!" : ""}`;
+      li.querySelector(".om-nums").textContent = `${fmtNum(m.progress)} / ${fmtNum(m.target)}${extra}`;
+      if (run.completed.includes(m.id)) li.className = "om-done";
+      return li;
+    });
+    ui.overMissions.querySelector("ul").replaceChildren(...rows);
+    const notes = [];
+    if (run.dayChanged) notes.push("Наступил новый день — задания обновлены");
+    if (run.autoCredited > 0) notes.push(`Вчерашние награды: +${run.autoCredited} монет в гараж`);
+    if (list.some((m) => m.completed && !m.claimed)) notes.push("Забери награду в «Заданиях»");
+    ui.overMissions.querySelector(".om-note").textContent = notes.join(". ");
+  }
+
+  function openMissions() {
+    if (mode !== "menu" && mode !== "over") return;
+    missionsFrom = mode;
+    mode = "missions";
+    setMissionsStatus("");
+    if (missionsOk) {
+      refreshMissionsDay();
+      if (!missions.seen) {
+        missions = markMissionsSeen(missions);
+        persistMissions();
+        if (!ui.missionsStatus.textContent) setMissionsStatus("Новые задания на сегодня", "good");
+      }
+    }
+    renderMissions();
+    renderMissionsButtons();
+    show("missions");
+    // фокус на карточку: Enter, которым открыли экран, не «заберёт» награду
+    ui.missionsCard.focus({ preventScroll: true });
+  }
+
+  function closeMissions() {
+    mode = missionsFrom;
+    show(missionsFrom);
+    if (missionsFrom === "menu") {
+      ui.menuBest.textContent = String(best);
+      refreshMissionsDay();
+    }
+    renderMissionsButtons();
+    $(missionsFrom === "over" ? "over-missions-open" : "menu-missions").focus({ preventScroll: true });
+  }
+
+  function claim(id) {
+    if (!missionsOk) return;
+    const btn = ui.missionsList.querySelector(`[data-claim="${CSS.escape(id)}"]`);
+    if (btn) btn.disabled = true; // двойное нажатие не даёт второго начисления
+    try {
+      const r = claimMissionReward(missions, garage, id, dayKey(now()));
+      missions = r.state;
+      garage = r.garage;
+      persistMissions();
+      setMissionsStatus(`+${r.reward} монет в гараж`, "good");
+    } catch (err) {
+      if (err.code === "stale-day") {
+        const r = refreshMissionsDay();
+        const credit = r && r.autoCredited > 0 ? `. Вчерашние награды: +${r.autoCredited} монет в гараж` : "";
+        setMissionsStatus(`${err.message}${credit}`, "bad");
+      } else if (err.code === "not-completed" || err.code === "already-claimed") {
+        setMissionsStatus(err.message, "bad");
+      } else {
+        console.warn("Задания: отказ в награде:", err);
+        setMissionsStatus(GENERIC_CLAIM_ERROR, "bad");
+      }
+    }
+    renderMissions();
+    renderMissionsButtons();
+    const next = ui.missionsList.querySelector("[data-claim]") || $("missions-back");
+    next.focus({ preventScroll: true });
+  }
+
+  // Предпросмотр в заезде: надпись в момент выполнения (UI FR-013), без сохранения.
+  function previewMissions() {
+    if (!missionsOk || missions.day !== dayKey(now())) return;
+    let ids;
+    try {
+      ids = previewCompleted(missions, runResultsFromWorld(world)).filter((id) => !announced.has(id));
+    } catch {
+      return;
+    }
+    if (!ids.length) return;
+    ids.forEach((id) => announced.add(id));
+    toastQueue.push(ids.length === 1 ? "Задание выполнено!" : `Задания выполнены: ${ids.length}`);
+  }
+
+  function drainToasts() {
+    if (toastQueue.length && clock >= toastUntil) showToast(toastQueue.shift(), "good");
   }
 
   // ---------- экран гаража ----------
@@ -362,7 +675,10 @@
   function closeGarage() {
     mode = garageFrom;
     show(garageFrom);
-    if (garageFrom === "menu") ui.menuBest.textContent = String(best);
+    if (garageFrom === "menu") {
+      ui.menuBest.textContent = String(best);
+      refreshMissionsDay();
+    }
     $(garageFrom === "over" ? "restart" : "start").focus({ preventScroll: true });
   }
 
@@ -382,6 +698,9 @@
     // Запускаем игру сразу, звук инициализируется параллельно
     world = createWorld(garage.levels); // уровни фиксируются на весь заезд
     runCredited = false;
+    announced = new Set();
+    toastQueue.length = 0;
+    ui.menuStatus.textContent = "";
     renderHudUpgrades(garage.levels);
     rng = createRng(Date.now() & 0x7fffffff);
     needleRpm = 0;
@@ -422,6 +741,10 @@
     world = createWorld();
     ui.menuBest.textContent = String(best);
     show("menu");
+    if (lastRun && lastRun.autoCredited > 0) {
+      ui.menuStatus.textContent = `Вчерашние награды: +${lastRun.autoCredited} монет в гараж`;
+    }
+    refreshMissionsDay();
     sound.setEngine(0, 1, false);
   }
 
@@ -442,6 +765,8 @@
     ui.overCoins.textContent = String(world.coins);
     ui.overPerfect.textContent = String(world.perfectShifts);
     ui.overSpeed.textContent = `${kmh(world.maxSpeed)} км/ч`;
+    renderOverMissions(lastRun);
+    renderMissionsButtons();
     show("over");
     $("restart").focus({ preventScroll: true });
   }
@@ -479,6 +804,11 @@
     if (mode === "garage" && e.code !== "KeyM" && e.code !== "KeyF") {
       // в гараже клавиши заезда (и Enter) не действуют, Esc — назад
       if (e.code === "Escape") closeGarage();
+      return;
+    }
+    if (mode === "missions" && e.code !== "KeyM" && e.code !== "KeyF") {
+      // на экране «Задания» клавиши заезда и Enter-старт не действуют, Esc — назад
+      if (e.code === "Escape") closeMissions();
       return;
     }
     if (e.code === "Enter" || e.code === "NumpadEnter") {
@@ -566,6 +896,13 @@
     const id = e.target.closest("button")?.dataset.buy;
     if (id) buy(id);
   });
+  $("menu-missions").addEventListener("click", openMissions);
+  $("over-missions-open").addEventListener("click", openMissions);
+  $("missions-back").addEventListener("click", closeMissions);
+  ui.missionsList.addEventListener("click", (e) => {
+    const id = e.target.closest("button")?.dataset.claim;
+    if (id) claim(id);
+  });
   window.addEventListener("resize", () => renderer.resize());
 
   // ---------- игровой цикл ----------
@@ -579,6 +916,7 @@
     if (mode === "playing") {
       world = step(world, dt, { brake: held.brake }, rng);
       handleEvents(world.events);
+      previewMissions();
       const p = world.player;
       sound.setEngine(displayRpm(p), p.gear, true);
     } else if (mode === "crashing") {
@@ -587,13 +925,30 @@
       if (crashTimer <= 0) gameOver();
     }
 
+    drainToasts();
     renderer.draw(world, clock, mode === "paused" ? 0 : dt);
-    if (mode !== "menu" && mode !== "garage") updateHud(dt);
+    if (mode !== "menu" && mode !== "garage" && mode !== "missions") updateHud(dt);
     requestAnimationFrame(loop);
   }
 
   buildTacho();
   ui.menuBest.textContent = String(best);
+  try {
+    missions = loadMissions(dayKey(now()));
+  } catch (err) {
+    console.error("Задания недоступны:", err);
+    missionsOk = false;
+  }
+  refreshMissionsDay();
+  renderMissionsButtons();
+  // Смена дня без перезагрузки: проверка в меню и на экране «Задания» (не реже раза в минуту).
+  setInterval(() => {
+    if (mode === "menu") refreshMissionsDay();
+    if (mode === "missions") {
+      refreshMissionsDay();
+      renderMissions();
+    }
+  }, 30000);
   show("menu");
   requestAnimationFrame(loop);
 
@@ -608,6 +963,17 @@
     get garage() {
       return garage;
     },
+    get missions() {
+      return missions;
+    },
+    setNow(ts) {
+      nowOffset = ts - Date.now();
+    },
+    refreshMissionsDay() {
+      refreshMissionsDay();
+      if (mode === "missions") renderMissions();
+    },
+    claimMission: claim,
     start,
     command,
     pause: pauseToggle,

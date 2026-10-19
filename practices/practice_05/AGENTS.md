@@ -28,11 +28,11 @@ Metro Rush (бывш. Race Mini) — браузерный раннер-гонк�
 ## Структура кода
 | Файл | Что внутри | Можно ли трогать DOM |
 |---|---|---|
-| `game.js` | Вся игровая логика: КПП, физика, прыжок, генерация трассы, столкновения, счёт, гараж (покупка улучшений, статы машины). Чистые функции, экспорт через `module.exports` + глобально через `<script>` | Нет |
+| `game.js` | Вся игровая логика: КПП, физика, прыжок, генерация трассы, столкновения, счёт, гараж (покупка улучшений, статы машины), ежедневные задания. Чистые функции, экспорт через `module.exports` + глобально через `<script>` | Нет |
 | `render.js` | `createRenderer(canvas)` — камера, проекция, отрисовка трассы, поездов, машины, частиц | Только canvas |
 | `audio.js` | `initSound()` — запуск звука с лимитом 2 с и статусом (фича B); `createSound()` — двигатель и звуки событий, все вызовы под `try/catch` | Только Web Audio |
-| `main.js` | Ввод (клавиатура, свайпы), игровой цикл, HUD, экраны (в т.ч. гараж), рекорд и гараж в localStorage, хук `window.__metro` для тестов | Да |
-| `index.html` | Разметка: canvas, HUD, меню, пауза, конец заезда, гараж | — |
+| `main.js` | Ввод (клавиатура, свайпы), игровой цикл, HUD, экраны (в т.ч. гараж и «Задания»), рекорд, гараж и задания в localStorage, хук `window.__metro` для тестов | Да |
+| `index.html` | Разметка: canvas, HUD, меню, пауза, конец заезда, гараж, задания | — |
 | `styles.css` | Стили интерфейса, токены из docs/DESIGN.md | — |
 | `test_game.js` | Юнит-тесты game.js (фича A и вся логика): `node test_game.js` | — |
 | `test_audio.js` | Юнит-тесты звука (фича B) с подменным `AudioContext`: `node test_audio.js` | — |
@@ -44,6 +44,7 @@ Metro Rush (бывш. Race Mini) — браузерный раннер-гонк�
 | `docs/style-guide.md` | 5 правил кода с примерами | — |
 | `docs/DESIGN.md` | Визуальный стиль | — |
 | `openspec/` | OpenSpec: спецификации (`specs/`) и изменения (`changes/`), например `changes/garage-upgrades` | — |
+| `.specify/`, `specs/` | GitHub Spec Kit (ДЗ 5): конституция `.specify/memory/constitution.md`; фичи `specs/001-daily-missions-ui`, `002-daily-missions-logic`, `003-daily-missions` и общий контракт `specs/daily-missions-contract.md` | — |
 
 Поток данных за кадр: `main.js` читает ввод → `applyCommand(world, cmd)` /
 `step(world, dt, input, rng)` из game.js → новый `world` + `world.events`
@@ -77,6 +78,18 @@ Metro Rush (бывш. Race Mini) — браузерный раннер-гонк�
   `try/catch`), `finishRun()` зачисляет монеты заезда один раз (авария и пауза →
   «В меню»), режим `garage` — клавиши заезда и Enter игнорируются, Esc — назад.
   В `window.__metro` есть `garage`.
+- Ежедневные задания (Spec Kit, контракт `specs/daily-missions-contract.md`): состояние
+  `{ day: "ГГГГ-ММ-ДД", seen, missions: [coins, perfectShifts, distance] }`, задание
+  `{ id: "<день>:<вид>", type, level, target, reward, progress, claimed }`; цели 60/150/300 монет,
+  3/8/12 переключений, 1000/3000/6000 м, награды 20/40/60 в кошелёк гаража. Функции: `dayKey`,
+  `nextDayStart`, `createDailyMissions`, `parseMissions`, `ensureMissionDay` (новый день —
+  автозачисление незабранных наград), `runResultsFromWorld`, `previewCompleted`,
+  `applyRunToMissions`, `claimMissionReward`, `markMissionsSeen`, `describeMissions`; ошибки —
+  `TypeError`/`RangeError` с полем `code` (`invalid-input`, `stale-day`, `unknown-mission`,
+  `not-completed`, `already-claimed`). Время приходит параметром.
+- В `main.js`: ключ `metro-rush-missions`, `now()` (сдвигается хуком), учёт заезда в `finishRun()`,
+  режим `missions`, проверка смены дня в меню и на экране «Задания» раз в 30 с. В `window.__metro`:
+  `missions`, `setNow(ts)`, `refreshMissionsDay()`, `claimMission(id)`.
 
 ## Конвенции по коду и тестам
 - Разделяй логику и рендер: правила — чистые функции без `document`/`window`/

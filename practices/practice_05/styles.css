@@ -545,6 +545,209 @@ kbd {
   color: var(--ink-soft);
 }
 
+/* ---------- ежедневные задания ---------- */
+
+.menu-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.btn-missions {
+  gap: 8px;
+}
+
+.badge {
+  padding: 3px 9px;
+  border: 2px solid var(--ink);
+  border-radius: var(--radius-pill);
+  background: var(--sun);
+  font: 900 12px/1 var(--font-body);
+  transform: rotate(-4deg);
+}
+
+.menu-status {
+  margin: 0;
+  min-height: 1.2em;
+  font-weight: 700;
+  color: var(--sun-light);
+  text-shadow: 0 2px 0 var(--ink);
+}
+
+.missions-card {
+  width: min(520px, 100%);
+}
+
+.missions-card:focus {
+  outline: none;
+}
+
+.missions-done {
+  padding: 8px 16px;
+  background: var(--sun);
+  border: 3px solid var(--ink);
+  border-radius: var(--radius-pill);
+  box-shadow: 4px 4px 0 var(--ink);
+  font: 900 16px/1.2 var(--font-body);
+  transform: rotate(-2deg);
+}
+
+.missions-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mission {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+  background: var(--mist);
+  text-align: left;
+}
+
+.mission[data-state="ready"] {
+  background: #e3f9ec;
+  box-shadow: 0 0 0 3px var(--go);
+}
+
+.mission[data-state="claimed"] {
+  opacity: 0.65;
+}
+
+.mission-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 10px;
+}
+
+.mission-head b {
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.mission-state {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.mission-bar {
+  height: 14px;
+  border: 3px solid var(--ink);
+  border-radius: var(--radius-pill);
+  background: var(--paper);
+  overflow: hidden;
+}
+
+.mission-fill {
+  height: 100%;
+  background: var(--graffiti-fill);
+  transition: width 0.3s ease;
+}
+
+.mission[data-state="ready"] .mission-fill,
+.mission[data-state="claimed"] .mission-fill {
+  background: var(--go);
+}
+
+.mission-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 44px;
+}
+
+.mission-nums {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.mission-reward {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 900;
+}
+
+.mission-reward .coin-icon,
+.btn-buy .coin-icon {
+  width: 18px;
+  height: 18px;
+  border-width: 2px;
+}
+
+.mission .btn-buy {
+  min-height: 44px;
+}
+
+.missions-unavailable {
+  margin: 0;
+  font-weight: 700;
+  color: var(--ember);
+}
+
+.over-missions {
+  width: 100%;
+  padding: 10px 12px;
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+  background: var(--mist);
+  text-align: left;
+}
+
+.over-missions h3 {
+  margin: 0 0 6px;
+  font: 900 15px/1.2 var(--font-body);
+}
+
+.over-missions ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+}
+
+.over-missions li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 2px 10px;
+}
+
+.over-missions .om-nums {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.over-missions li.om-done .om-nums {
+  color: #1f8a50;
+}
+
+.om-note {
+  margin: 6px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.om-note:empty {
+  display: none;
+}
+
 /* ---------- HUD ---------- */
 
 .hud {
@@ -974,6 +1177,10 @@ kbd {
 }
 
 @media (prefers-reduced-motion: reduce) {
+
+  .mission-fill {
+    transition: none;
+  }
 
   .spark,
   .shift-lights.limiter span,
