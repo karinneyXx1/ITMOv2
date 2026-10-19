@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -33,5 +33,5 @@
 
 - Итерация валидации 1: в FR-010 было «в том же кадре взаимодействия» (деталь реализации) — заменено на «сразу, без перехода между экранами»; FR-013 переформулирован без ссылки на самого себя.
 - Раздел «Что UI ожидает от логики» намеренно описывает потребности в данных и операциях (принцип VI конституции — вход в общий контракт); имена, форматы и алгоритмы не задаёт.
-- Открыто 2 маркера [NEEDS CLARIFICATION]: FR-009 (где забирать награду — только экран «Задания» или ещё экран итогов), FR-016 (судьба незабранных вчерашних наград). Закрываются через `/speckit-clarify` или при согласовании контракта с командой логики.
+- Clarify, сессия 2026-10-19: маркеры FR-009 (награда забирается только на экране «Задания») и FR-016 (вчерашние награды автоматически зачисляются с сообщением) сняты, прогресс во время заезда — только всплывающая надпись. Обновлены US4-4, FR-009, FR-016, Edge Cases, SC-008, Assumptions и «Что UI ожидает от логики». Маркеров не осталось, все пункты чеклиста пройдены.
 - Items marked incomplete require spec updates before `/speckit-clarify` or `/speckit-plan`
