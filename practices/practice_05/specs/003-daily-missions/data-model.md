@@ -49,8 +49,8 @@
 
 ## Итоги заезда (RunResults)
 
-`{ coins, perfectShifts, distance }` — целые ≥ 0. Нецелое/не число → `TypeError`
-(`invalid-input`); отрицательное или нецелое число → `RangeError` (`invalid-input`).
+`{ coins, perfectShifts, distance }` — целые ≥ 0. Не число (или не объект) → `TypeError`
+(`invalid-input`); отрицательное или дробное число → `RangeError` (`invalid-input`).
 
 ## Хранилище
 
