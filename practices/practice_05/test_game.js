@@ -818,3 +818,231 @@ test("прыжок 3: в верхней точке в 1.3 раза выше, д�
   for (let i = 0; i < Math.ceil(JUMP_DURATION * 60) + 1; i++) p = updatePlayer(p, 1 / 60, {});
   assert.equal(p.jumping, false, "прыжок 3 закончился за то же время");
 });
+
+// ================= Ежедневные задания (Spec Kit 003-daily-missions, контракт v1.1) =================
+
+const ms = require("./game.js");
+const at = (y, m, d, h = 12, min = 0) => new Date(y, m - 1, d, h, min).getTime();
+const codeIs = (Cls, code, re) => (err) => err instanceof Cls && err.code === code && (!re || re.test(err.message));
+const done = (state, type) => ({
+  ...state,
+  missions: state.missions.map((m) => (m.type === type ? { ...m, progress: m.target } : m)),
+});
+
+test("задания: каталог видов, целей и наград по контракту", () => {
+  assert.deepEqual(ms.MISSION_TYPE_IDS, ["coins", "perfectShifts", "distance"]);
+  assert.deepEqual(ms.MISSION_TYPES.coins.targets, [60, 150, 300]);
+  assert.deepEqual(ms.MISSION_TYPES.perfectShifts.targets, [3, 8, 12]);
+  assert.deepEqual(ms.MISSION_TYPES.distance.targets, [1000, 3000, 6000]);
+  assert.deepEqual(ms.MISSION_REWARDS, [20, 40, 60]);
+});
+
+test("задания: dayKey — местная дата, полночь разделяет дни", () => {
+  assert.equal(ms.dayKey(at(2026, 10, 19, 23, 59)), "2026-10-19");
+  assert.equal(ms.dayKey(at(2026, 10, 20, 0, 1)), "2026-10-20");
+  assert.equal(ms.dayKey(at(2026, 1, 5)), "2026-01-05");
+});
+
+test("задания: nextDayStart — ближайшая местная полночь", () => {
+  assert.equal(ms.nextDayStart(at(2026, 10, 19, 15, 30)), new Date(2026, 9, 20).getTime());
+  assert.equal(ms.nextDayStart(at(2026, 12, 31, 23)), new Date(2027, 0, 1).getTime());
+});
+
+test("задания: неверное время — invalid-input (тип → TypeError, значение → RangeError)", () => {
+  assert.throws(() => ms.dayKey("сегодня"), codeIs(TypeError, "invalid-input"));
+  assert.throws(() => ms.nextDayStart(NaN), codeIs(RangeError, "invalid-input"));
+});
+
+test("задания: createDailyMissions — 3 задания по порядку видов, id с днём, прогресс 0", () => {
+  const s = ms.createDailyMissions("2026-10-19");
+  assert.equal(s.day, "2026-10-19");
+  assert.equal(s.seen, false);
+  assert.deepEqual(s.missions.map((m) => m.type), ["coins", "perfectShifts", "distance"]);
+  for (const m of s.missions) {
+    assert.equal(m.id, `2026-10-19:${m.type}`);
+    assert.equal(m.progress, 0);
+    assert.equal(m.claimed, false);
+    assert.equal(m.target, ms.MISSION_TYPES[m.type].targets[m.level]);
+    assert.equal(m.reward, ms.MISSION_REWARDS[m.level]);
+  }
+});
+
+test("задания: одна дата — один и тот же набор", () => {
+  assert.deepEqual(ms.createDailyMissions("2026-10-19"), ms.createDailyMissions("2026-10-19"));
+});
+
+test("задания: на 365 днях подряд набор отличается от вчерашнего хотя бы одной целью", () => {
+  let prev = ms.createDailyMissions(ms.dayKey(at(2026, 1, 1)));
+  for (let i = 1; i < 365; i++) {
+    const cur = ms.createDailyMissions(ms.dayKey(at(2026, 1, 1 + i)));
+    const same = cur.missions.every((m, k) => m.target === prev.missions[k].target);
+    assert.equal(same, false, cur.day);
+    prev = cur;
+  }
+});
+
+test("задания: неверный ключ дня — invalid-input", () => {
+  assert.throws(() => ms.createDailyMissions(20261019), codeIs(TypeError, "invalid-input"));
+  assert.throws(() => ms.createDailyMissions("2026-13-45"), codeIs(RangeError, "invalid-input"));
+});
+
+test("задания: parseMissions — сохранённый прогресс того же дня читается", () => {
+  const s = ms.createDailyMissions("2026-10-19");
+  s.missions[0] = { ...s.missions[0], progress: 37 };
+  const back = ms.parseMissions(JSON.stringify({ ...s, seen: true }), "2026-10-19");
+  assert.equal(back.missions[0].progress, 37);
+  assert.equal(back.seen, true);
+});
+
+test("задания: parseMissions — мусор, null и не тот состав дают набор дня с нулём", () => {
+  const fresh = ms.createDailyMissions("2026-10-19");
+  assert.deepEqual(ms.parseMissions("{мусор", "2026-10-19"), fresh);
+  assert.deepEqual(ms.parseMissions(null, "2026-10-19"), fresh);
+  assert.deepEqual(ms.parseMissions(JSON.stringify({ day: "2026-10-19", missions: [] }), "2026-10-19"), fresh);
+});
+
+test("задания: parseMissions — плохой прогресс → 0, больше цели → цель, цели и награды из правил", () => {
+  const s = ms.createDailyMissions("2026-10-19");
+  const raw = {
+    ...s,
+    missions: [
+      { ...s.missions[0], progress: -5, target: 1, reward: 999 },
+      { ...s.missions[1], progress: "abc" },
+      { ...s.missions[2], progress: 10 ** 9 },
+    ],
+  };
+  const back = ms.parseMissions(JSON.stringify(raw), "2026-10-19");
+  assert.equal(back.missions[0].progress, 0);
+  assert.equal(back.missions[0].target, s.missions[0].target);
+  assert.equal(back.missions[0].reward, s.missions[0].reward);
+  assert.equal(back.missions[1].progress, 0);
+  assert.equal(back.missions[2].progress, s.missions[2].target);
+});
+
+test("задания: parseMissions — набор «из будущего» (часы откатили) остаётся", () => {
+  const s = ms.createDailyMissions("2026-10-19");
+  assert.equal(ms.parseMissions(JSON.stringify(s), "2026-10-18").day, "2026-10-19");
+});
+
+test("задания: ensureMissionDay — тот же или ранний день ничего не меняет", () => {
+  const s = ms.createDailyMissions("2026-10-19");
+  const g = ms.createGarage();
+  for (const day of ["2026-10-19", "2026-10-18"]) {
+    const r = ms.ensureMissionDay(s, g, day);
+    assert.equal(r.state, s);
+    assert.equal(r.garage, g);
+    assert.equal(r.autoCredited, 0);
+    assert.equal(r.dayChanged, false);
+  }
+});
+
+test("задания: ensureMissionDay — новый день: автозачисление незабранных и новый набор", () => {
+  let s = done(done(ms.createDailyMissions("2026-10-19"), "coins"), "distance");
+  s = { ...s, missions: s.missions.map((m) => (m.type === "distance" ? { ...m, claimed: true } : m)) };
+  const coinsReward = s.missions[0].reward;
+  const g = { ...ms.createGarage(), coins: 100 };
+  const r = ms.ensureMissionDay(s, g, "2026-10-23");
+  assert.equal(r.autoCredited, coinsReward);
+  assert.equal(r.garage.coins, 100 + coinsReward);
+  assert.equal(r.dayChanged, true);
+  assert.deepEqual(r.state, ms.createDailyMissions("2026-10-23"));
+  assert.equal(g.coins, 100, "исходный гараж не мутирует");
+});
+
+test("задания: runResultsFromWorld — монеты, переключения, целые метры", () => {
+  const w = { ...ms.createWorld(), coins: 12, perfectShifts: 3 };
+  const r = ms.runResultsFromWorld({ ...w, player: { ...w.player, z: 1234.9 } });
+  assert.deepEqual(r, { coins: 12, perfectShifts: 3, distance: 1234 });
+  assert.throws(() => ms.runResultsFromWorld(null), codeIs(TypeError, "invalid-input"));
+});
+
+test("задания: applyRunToMissions — прибавка, потолок цели, gains и completed", () => {
+  const s = ms.createDailyMissions("2026-10-19");
+  const [c, p, d] = s.missions;
+  const pre = { ...s, missions: [{ ...c, progress: c.target - 10 }, p, d] };
+  const r = ms.applyRunToMissions(pre, ms.createGarage(), { coins: 25, perfectShifts: 1, distance: 500 }, "2026-10-19");
+  assert.equal(r.state.missions[0].progress, c.target);
+  assert.equal(r.gains[c.id], 10);
+  assert.equal(r.gains[p.id], 1);
+  assert.equal(r.gains[d.id], 500);
+  assert.deepEqual(r.completed, [c.id]);
+  assert.equal(r.dayChanged, false);
+  assert.equal(pre.missions[0].progress, c.target - 10, "исходное состояние не мутирует");
+});
+
+test("задания: applyRunToMissions — выполненное задание не меняется", () => {
+  const s = done(ms.createDailyMissions("2026-10-19"), "coins");
+  const r = ms.applyRunToMissions(s, ms.createGarage(), { coins: 50, perfectShifts: 0, distance: 0 }, "2026-10-19");
+  assert.equal(r.gains[s.missions[0].id], 0);
+  assert.deepEqual(r.completed, []);
+});
+
+test("задания: applyRunToMissions — после полуночи итоги идут в новый день", () => {
+  const s = ms.createDailyMissions("2026-10-19");
+  const r = ms.applyRunToMissions(s, ms.createGarage(), { coins: 5, perfectShifts: 0, distance: 0 }, "2026-10-20");
+  assert.equal(r.dayChanged, true);
+  assert.equal(r.state.day, "2026-10-20");
+  assert.equal(r.state.missions[0].progress, 5);
+});
+
+test("задания: неверные итоги заезда — invalid-input, состояние не меняется", () => {
+  const s = ms.createDailyMissions("2026-10-19");
+  const g = ms.createGarage();
+  assert.throws(() => ms.applyRunToMissions(s, g, { coins: "5", perfectShifts: 0, distance: 0 }, "2026-10-19"), codeIs(TypeError, "invalid-input"));
+  assert.throws(() => ms.applyRunToMissions(s, g, { coins: -1, perfectShifts: 0, distance: 0 }, "2026-10-19"), codeIs(RangeError, "invalid-input"));
+  assert.throws(() => ms.applyRunToMissions(s, g, { coins: 1.5, perfectShifts: 0, distance: 0 }, "2026-10-19"), codeIs(RangeError, "invalid-input"));
+});
+
+test("задания: previewCompleted совпадает с completed и не меняет состояние", () => {
+  const s = ms.createDailyMissions("2026-10-19");
+  const pre = { ...s, missions: s.missions.map((m) => ({ ...m, progress: m.target - 1 })) };
+  const snapshot = JSON.stringify(pre);
+  const results = { coins: 1, perfectShifts: 0, distance: 5 };
+  const preview = ms.previewCompleted(pre, results);
+  assert.equal(JSON.stringify(pre), snapshot);
+  assert.deepEqual(preview, ms.applyRunToMissions(pre, ms.createGarage(), results, "2026-10-19").completed);
+  assert.deepEqual(ms.previewCompleted(done(pre, "coins"), results), [pre.missions[2].id], "уже выполненные не возвращаются");
+});
+
+test("задания: claimMissionReward — награда в кошелёк, уровни гаража целы", () => {
+  const s = done(ms.createDailyMissions("2026-10-19"), "coins");
+  const g = { coins: 100, levels: { engine: 2, nitro: 0, jump: 1 } };
+  const m = s.missions[0];
+  const r = ms.claimMissionReward(s, g, m.id, "2026-10-19");
+  assert.equal(r.reward, m.reward);
+  assert.equal(r.garage.coins, 100 + m.reward);
+  assert.deepEqual(r.garage.levels, g.levels);
+  assert.equal(r.state.missions[0].claimed, true);
+  assert.equal(s.missions[0].claimed, false, "исходное состояние не мутирует");
+});
+
+test("задания: claimMissionReward — отказы с кодами, ничего не меняется", () => {
+  const s = ms.createDailyMissions("2026-10-19");
+  const g = ms.createGarage();
+  const [c] = s.missions;
+  const partial = { ...s, missions: [{ ...c, progress: 37 }, ...s.missions.slice(1)] };
+  assert.throws(() => ms.claimMissionReward(partial, g, c.id, "2026-10-19"), codeIs(RangeError, "not-completed", new RegExp(`^Задание ещё не выполнено: 37 из ${c.target}$`)));
+  const claimed = ms.claimMissionReward(done(s, "coins"), g, c.id, "2026-10-19").state;
+  assert.throws(() => ms.claimMissionReward(claimed, g, c.id, "2026-10-19"), codeIs(RangeError, "already-claimed", /^Награда за задание уже получена$/));
+  assert.throws(() => ms.claimMissionReward(s, g, "2026-10-19:jumps", "2026-10-19"), codeIs(RangeError, "unknown-mission", /неизвестное задание/));
+  assert.throws(() => ms.claimMissionReward(done(s, "coins"), g, c.id, "2026-10-20"), codeIs(RangeError, "stale-day", /^Задания устарели — наступил новый день$/));
+  assert.throws(() => ms.claimMissionReward(s, g, 42, "2026-10-19"), codeIs(TypeError, "invalid-input"));
+  assert.equal(g.coins, 0);
+});
+
+test("задания: claimMissionReward — при откате часов награда выдаётся", () => {
+  const s = done(ms.createDailyMissions("2026-10-19"), "coins");
+  const r = ms.claimMissionReward(s, ms.createGarage(), s.missions[0].id, "2026-10-18");
+  assert.equal(r.garage.coins, s.missions[0].reward);
+});
+
+test("задания: markMissionsSeen и describeMissions", () => {
+  const s = done(ms.createDailyMissions("2026-10-19"), "coins");
+  assert.equal(ms.markMissionsSeen(s).seen, true);
+  assert.equal(s.seen, false);
+  const d = ms.describeMissions(s);
+  assert.equal(d.length, 3);
+  assert.deepEqual(Object.keys(d[0]).sort(), ["claimed", "completed", "id", "level", "progress", "reward", "target", "type"]);
+  assert.equal(d[0].completed, true);
+  assert.equal(d[1].completed, false);
+});

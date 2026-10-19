@@ -714,6 +714,250 @@ function statsForLevels(levels = {}) {
   };
 }
 
+// ---------- ежедневные задания (Spec Kit 003-daily-missions, specs/daily-missions-contract.md) ----------
+
+const MISSION_TYPE_IDS = ["coins", "perfectShifts", "distance"];
+// Цели по уровням сложности (лёгкое/среднее/сложное) — замер автопилотом: заезд ≈ 57–104 монеты,
+// 2 идеальных переключения, 840–1500 м.
+const MISSION_TYPES = {
+  coins: { targets: [60, 150, 300] },
+  perfectShifts: { targets: [3, 8, 12] },
+  distance: { targets: [1000, 3000, 6000] },
+};
+const MISSION_REWARDS = [20, 40, 60]; // награда по уровню сложности, одинакова для всех видов
+const DAY_KEY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/** Ошибка логики заданий с полем code (контракт, раздел 4). */
+function missionError(Cls, code, message) {
+  const err = new Cls(message);
+  err.code = code;
+  return err;
+}
+
+function validateTimestamp(ts) {
+  if (typeof ts !== "number") {
+    throw missionError(TypeError, "invalid-input", `время должно быть числом, получено ${typeof ts}`);
+  }
+  if (!Number.isFinite(ts)) {
+    throw missionError(RangeError, "invalid-input", `время должно быть конечным числом, получено ${ts}`);
+  }
+}
+
+function validateDayKey(day) {
+  if (typeof day !== "string") {
+    throw missionError(TypeError, "invalid-input", `ключ дня должен быть строкой "ГГГГ-ММ-ДД", получено ${typeof day}`);
+  }
+  const m = DAY_KEY_RE.exec(day);
+  const date = m && new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12);
+  if (!m || date.getMonth() !== Number(m[2]) - 1 || date.getDate() !== Number(m[3])) {
+    throw missionError(RangeError, "invalid-input", `неверный ключ дня: "${day}"`);
+  }
+}
+
+function validateRunResults(results) {
+  if (typeof results !== "object" || results === null) {
+    throw missionError(TypeError, "invalid-input", "итоги заезда должны быть объектом { coins, perfectShifts, distance }");
+  }
+  for (const type of MISSION_TYPE_IDS) {
+    const v = results[type];
+    if (typeof v !== "number") {
+      throw missionError(TypeError, "invalid-input", `итоги заезда: ${type} должно быть числом, получено ${typeof v}`);
+    }
+    if (!Number.isInteger(v) || v < 0) {
+      throw missionError(RangeError, "invalid-input", `итоги заезда: ${type} должно быть целым ≥ 0, получено ${v}`);
+    }
+  }
+}
+
+const pad2 = (n) => String(n).padStart(2, "0");
+
+/** Календарный день по местному времени: "ГГГГ-ММ-ДД". */
+function dayKey(ts) {
+  validateTimestamp(ts);
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+/** Момент ближайшей местной полуночи после ts (учитывает переход на летнее/зимнее время). */
+function nextDayStart(ts) {
+  validateTimestamp(ts);
+  const d = new Date(ts);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
+}
+
+// Зерно генератора из строки дня (FNV-1a) — один день даёт один набор на любом устройстве.
+function daySeed(day) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < day.length; i++) {
+    h ^= day.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h;
+}
+
+// Уровни сложности дня: монеты и переключения — случайно по дате; дистанция — по номеру дня
+// (% 3), поэтому соседние дни всегда отличаются хотя бы одной целью.
+function missionLevels(day) {
+  const [y, m, d] = day.split("-").map(Number);
+  const dayNumber = Math.round(Date.UTC(y, m - 1, d) / 86400000);
+  const rng = createRng(daySeed(day));
+  return [Math.floor(rng() * 3), Math.floor(rng() * 3), dayNumber % 3];
+}
+
+/** Новый набор дня: по одному заданию каждого вида, прогресс 0. */
+function createDailyMissions(day) {
+  validateDayKey(day);
+  const levels = missionLevels(day);
+  return {
+    day,
+    seen: false,
+    missions: MISSION_TYPE_IDS.map((type, i) => ({
+      id: `${day}:${type}`,
+      type,
+      level: levels[i],
+      target: MISSION_TYPES[type].targets[levels[i]],
+      reward: MISSION_REWARDS[levels[i]],
+      progress: 0,
+      claimed: false,
+    })),
+  };
+}
+
+/**
+ * Разбор сохранения: никогда не бросает при корректном day. Испорченное целиком — новый набор
+ * на day; испорченный прогресс одного задания — 0; цели и награды — из правил дня.
+ */
+function parseMissions(raw, day) {
+  validateDayKey(day);
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    return createDailyMissions(day);
+  }
+  let base;
+  try {
+    base = createDailyMissions(data.day);
+  } catch {
+    return createDailyMissions(day);
+  }
+  const saved = data.missions;
+  const shapeOk =
+    Array.isArray(saved) &&
+    saved.length === base.missions.length &&
+    saved.every((m, i) => m !== null && typeof m === "object" && m.id === base.missions[i].id && m.type === base.missions[i].type);
+  if (!shapeOk) {
+    return createDailyMissions(day);
+  }
+  return {
+    day: base.day,
+    seen: data.seen === true,
+    missions: base.missions.map((m, i) => {
+      const p = saved[i].progress;
+      const progress = Number.isInteger(p) && p >= 0 ? Math.min(p, m.target) : 0;
+      return { ...m, progress, claimed: saved[i].claimed === true };
+    }),
+  };
+}
+
+/** Актуализация дня: в новый день — автозачисление незабранных наград и новый набор. */
+function ensureMissionDay(state, garage, day) {
+  validateDayKey(day);
+  if (day <= state.day) {
+    return { state, garage, autoCredited: 0, dayChanged: false };
+  }
+  const autoCredited = state.missions
+    .filter((m) => m.progress >= m.target && !m.claimed)
+    .reduce((sum, m) => sum + m.reward, 0);
+  return {
+    state: createDailyMissions(day),
+    garage: autoCredited > 0 ? creditCoins(garage, autoCredited) : garage,
+    autoCredited,
+    dayChanged: true,
+  };
+}
+
+/** Итоги заезда для заданий: монеты, идеальные переключения, целые метры. */
+function runResultsFromWorld(world) {
+  if (typeof world !== "object" || world === null || typeof world.player !== "object" || world.player === null) {
+    throw missionError(TypeError, "invalid-input", "ожидается мир заезда");
+  }
+  return { coins: world.coins, perfectShifts: world.perfectShifts, distance: Math.floor(world.player.z) };
+}
+
+/** Какие задания эти итоги впервые довели бы до цели; состояние не меняется. */
+function previewCompleted(state, results) {
+  validateRunResults(results);
+  return state.missions
+    .filter((m) => m.progress < m.target && m.progress + results[m.type] >= m.target)
+    .map((m) => m.id);
+}
+
+/** Учёт заезда: актуализация дня, прибавка к невыполненным с потолком цели. */
+function applyRunToMissions(state, garage, results, day) {
+  validateRunResults(results);
+  const current = ensureMissionDay(state, garage, day);
+  const gains = {};
+  const completed = [];
+  const missions = current.state.missions.map((m) => {
+    const add = Math.min(results[m.type], m.target - m.progress);
+    gains[m.id] = add;
+    if (add === 0) {
+      return m;
+    }
+    if (m.progress + add === m.target) {
+      completed.push(m.id);
+    }
+    return { ...m, progress: m.progress + add };
+  });
+  return { ...current, state: { ...current.state, missions }, gains, completed };
+}
+
+/** Забрать награду: монеты в кошелёк гаража, задание помечается полученным. */
+function claimMissionReward(state, garage, id, day) {
+  if (typeof id !== "string") {
+    throw missionError(TypeError, "invalid-input", `id задания должен быть строкой, получено ${typeof id}`);
+  }
+  validateDayKey(day);
+  const idDay = id.slice(0, 10);
+  if (DAY_KEY_RE.test(idDay) && idDay < day) {
+    throw missionError(RangeError, "stale-day", "Задания устарели — наступил новый день");
+  }
+  const mission = state.missions.find((m) => m.id === id);
+  if (!mission) {
+    throw missionError(RangeError, "unknown-mission", `неизвестное задание: "${id}"`);
+  }
+  if (mission.progress < mission.target) {
+    throw missionError(RangeError, "not-completed", `Задание ещё не выполнено: ${mission.progress} из ${mission.target}`);
+  }
+  if (mission.claimed) {
+    throw missionError(RangeError, "already-claimed", "Награда за задание уже получена");
+  }
+  return {
+    state: { ...state, missions: state.missions.map((m) => (m.id === id ? { ...m, claimed: true } : m)) },
+    garage: creditCoins(garage, mission.reward),
+    reward: mission.reward,
+  };
+}
+
+function markMissionsSeen(state) {
+  return { ...state, seen: true };
+}
+
+/** Данные для показа: задания с производным признаком completed. */
+function describeMissions(state) {
+  return state.missions.map((m) => ({
+    id: m.id,
+    type: m.type,
+    level: m.level,
+    target: m.target,
+    progress: m.progress,
+    completed: m.progress >= m.target,
+    claimed: m.claimed,
+    reward: m.reward,
+  }));
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     LANES,
@@ -778,5 +1022,19 @@ if (typeof module !== "undefined" && module.exports) {
     JUMP_HEIGHT_SCALE,
     validateUpgradeLevels,
     statsForLevels,
+    MISSION_TYPE_IDS,
+    MISSION_TYPES,
+    MISSION_REWARDS,
+    dayKey,
+    nextDayStart,
+    createDailyMissions,
+    parseMissions,
+    ensureMissionDay,
+    runResultsFromWorld,
+    previewCompleted,
+    applyRunToMissions,
+    claimMissionReward,
+    markMissionsSeen,
+    describeMissions,
   };
 }

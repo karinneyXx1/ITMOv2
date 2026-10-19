@@ -21,7 +21,7 @@ quickstart.md) + спеки 001, 002 и [контракт v1.1](../daily-mission
 
 ## Phase 1: Setup
 
-- [ ] T001 Зафиксировать базовую линию: `sh scripts/check.sh --full` → `CHECK: PASS` до любых правок (число тестов `test_game.js` и сценариев `test_browser.py` записать в отчёт)
+- [X] T001 Зафиксировать базовую линию: `sh scripts/check.sh --full` → `CHECK: PASS` до любых правок (число тестов `test_game.js` и сценариев `test_browser.py` записать в отчёт)
 
 ---
 
@@ -29,16 +29,16 @@ quickstart.md) + спеки 001, 002 и [контракт v1.1](../daily-mission
 
 **Purpose**: операции раздела 3 контракта, чистые функции, каждая — сначала падающий тест в `test_game.js`.
 
-- [ ] T002 Тесты + константы `MISSION_TYPES` (coins/perfectShifts/distance, цели 60/150/300, 3/8/12, 1000/3000/6000) и `MISSION_REWARDS` (20/40/60), helper `missionError(Cls, code, message)` в `game.js`
-- [ ] T003 Тесты + `dayKey(ts)` и `nextDayStart(ts)` (местное время, переход 23:59→00:00, неверный ввод → `invalid-input`: тип → TypeError, значение → RangeError) в `game.js`
-- [ ] T004 Тесты + `createDailyMissions(day)`: 3 задания в порядке видов, id `"<day>:<type>"`, прогресс 0, `seen: false`; одна дата — один набор; на 365 датах набор отличается от вчерашнего хотя бы одной целью (research §1) в `game.js`
-- [ ] T005 Тесты + `parseMissions(raw, day)`: мусор/null/неверная дата/не тот состав → новый набор; плохой прогресс → 0; больше цели → цель; цели и награды из правил, не из сохранения; набор с днём позже `day` остаётся; никогда не бросает в `game.js`
-- [ ] T006 Тесты + `ensureMissionDay(state, garage, day)`: тот же/ранний день — без изменений, `autoCredited: 0`, `dayChanged: false`; поздний день — новый набор, автозачисление незабранных выполненных, пропущенные дни ничего не дают; исходные объекты не мутируются в `game.js`
-- [ ] T007 Тесты + `runResultsFromWorld(world)` и проверка итогов (`floor(player.z)`, целые ≥ 0, `invalid-input`) в `game.js`
-- [ ] T008 Тесты + `applyRunToMissions(state, garage, results, day)`: актуализация дня первой, прибавка к невыполненным с потолком цели, `gains`, `completed`, выполненные не меняются, монеты наград не считаются в `game.js`
-- [ ] T009 Тесты + `previewCompleted(state, results)`: какие задания эти итоги впервые довели бы до цели; состояние не меняется; совпадает с `completed` у `applyRunToMissions` в `game.js`
-- [ ] T010 Тесты + `claimMissionReward(state, garage, id, day)`: успех (+reward, `claimed`, уровни гаража целы); `stale-day` (день в id раньше `day`), `unknown-mission`, `not-completed` «Задание ещё не выполнено: X из Y», `already-claimed`, `invalid-input`; при откате часов — выдаётся; при ошибке ничего не меняется в `game.js`
-- [ ] T011 Тесты + `markMissionsSeen(state)` и `describeMissions(state)`; экспорт всех функций и констант в `module.exports`; `sh scripts/check.sh` → `CHECK: PASS` в `game.js`
+- [X] T002 Тесты + константы `MISSION_TYPES` (coins/perfectShifts/distance, цели 60/150/300, 3/8/12, 1000/3000/6000) и `MISSION_REWARDS` (20/40/60), helper `missionError(Cls, code, message)` в `game.js`
+- [X] T003 Тесты + `dayKey(ts)` и `nextDayStart(ts)` (местное время, переход 23:59→00:00, неверный ввод → `invalid-input`: тип → TypeError, значение → RangeError) в `game.js`
+- [X] T004 Тесты + `createDailyMissions(day)`: 3 задания в порядке видов, id `"<day>:<type>"`, прогресс 0, `seen: false`; одна дата — один набор; на 365 датах набор отличается от вчерашнего хотя бы одной целью (research §1) в `game.js`
+- [X] T005 Тесты + `parseMissions(raw, day)`: мусор/null/неверная дата/не тот состав → новый набор; плохой прогресс → 0; больше цели → цель; цели и награды из правил, не из сохранения; набор с днём позже `day` остаётся; никогда не бросает в `game.js`
+- [X] T006 Тесты + `ensureMissionDay(state, garage, day)`: тот же/ранний день — без изменений, `autoCredited: 0`, `dayChanged: false`; поздний день — новый набор, автозачисление незабранных выполненных, пропущенные дни ничего не дают; исходные объекты не мутируются в `game.js`
+- [X] T007 Тесты + `runResultsFromWorld(world)` и проверка итогов (`floor(player.z)`, целые ≥ 0, `invalid-input`) в `game.js`
+- [X] T008 Тесты + `applyRunToMissions(state, garage, results, day)`: актуализация дня первой, прибавка к невыполненным с потолком цели, `gains`, `completed`, выполненные не меняются, монеты наград не считаются в `game.js`
+- [X] T009 Тесты + `previewCompleted(state, results)`: какие задания эти итоги впервые довели бы до цели; состояние не меняется; совпадает с `completed` у `applyRunToMissions` в `game.js`
+- [X] T010 Тесты + `claimMissionReward(state, garage, id, day)`: успех (+reward, `claimed`, уровни гаража целы); `stale-day` (день в id раньше `day`), `unknown-mission`, `not-completed` «Задание ещё не выполнено: X из Y», `already-claimed`, `invalid-input`; при откате часов — выдаётся; при ошибке ничего не меняется в `game.js`
+- [X] T011 Тесты + `markMissionsSeen(state)` и `describeMissions(state)`; экспорт всех функций и констант в `module.exports`; `sh scripts/check.sh` → `CHECK: PASS` в `game.js`
 
 **Checkpoint**: логика полностью покрыта тестами Node, UI ещё не тронут.
 
