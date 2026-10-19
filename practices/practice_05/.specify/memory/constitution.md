@@ -1,50 +1,75 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+# Metro Rush Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Правила игры — чистые функции
+Вся игровая логика и правила фич (гараж, задания и т.п.) живут в `game.js` как чистые
+функции: без `document`, `window`, `canvas`, `localStorage` и `Math.random`; исходное
+состояние не мутируется, случайность и текущее время приходят параметром.
+DOM, хранилище, звук и рендер — только в `main.js`, `render.js`, `audio.js`.
+Обоснование: логика тестируется в Node без браузера и детерминирована по seed.
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### II. Внешний ввод проверяется сразу и громко
+Операция, принимающая внешний ввод, первой строкой вызывает отдельную `validateX()`;
+на плохом вводе — `TypeError` или `RangeError` с понятным текстом, а не тихий `null`
+или `false`. При ошибке состояние не меняется.
+Обоснование: ошибка видна там, где возникла, и её текст можно показать игроку.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### III. Сбой браузерного API не роняет игру
+Вызовы `localStorage`, Web Audio, fullscreen оборачиваются в `try/catch` с запасным
+путём; повреждённое сохранение разбирается терпимо (непонятная часть — к умолчанию,
+корректные данные игрока сохраняются).
+Обоснование: однопользовательская офлайн-игра должна оставаться играбельной всегда.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### IV. Сначала тест, через публичный интерфейс (NON-NEGOTIABLE)
+Новое поведение начинается с падающего теста, затем минимальный код. Тесты вызывают
+экспортируемые функции, используют только `node:test`/`node:assert`, одна проверка
+поведения на тест, название на русском. Пользовательские сценарии проверяются
+сквозным браузерным тестом (`test_browser.py`).
+Обоснование: тест фиксирует поведение из спеки и ловит регрессии.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### V. Проверки не ослабляются
+Нельзя менять ожидания существующих тестов, удалять тесты или править
+`scripts/check.sh`, чтобы стало зелёным, — только по явному решению человека.
+Существующее поведение (гараж, улучшения, MCP) сохраняется; изменения в нём
+допускаются, только если спека прямо их требует.
+Обоснование: зелёная проверка должна что-то значить.
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+### VI. UI и логика согласуются через контракт до кода
+Для фичи с интерфейсом и правилами пишутся две спецификации — UI (экраны, действия,
+состояния, ошибки) и логики (данные, алгоритм, правила, API). До генерации кода они
+сверяются, решения фиксируются в общем контракте (данные, вызовы, ошибки, состояния),
+и обе спеки обновляются под него. Код, расходящийся с контрактом, — дефект.
+Обоснование: UI и логика стыкуются по заранее согласованному интерфейсу, а не по
+догадкам каждой стороны.
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+## Ограничения проекта
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+- Vanilla JavaScript (ES2020+) без сборки: игра открывается напрямую через `index.html`.
+- В игре нет npm-зависимостей, TypeScript и бандлеров; npm допустим только в `mcp/`.
+- Внешний вид — по `docs/DESIGN.md` (токены, карточки, кнопки-пилюли, шрифты Bungee/Rubik);
+  весь текст интерфейса на русском.
+- Клавиши читаются по `e.code`; экраны с собственными клавишами имеют свой режим `mode`,
+  чтобы клавиши заезда в них не срабатывали.
+- Данные игрока хранятся в `localStorage`, по одному JSON-ключу на область
+  (пример: `metro-rush-garage`); монеты — общий кошелёк гаража.
+- Существующий код и тесты сохраняются; правки в них — только по требованию спеки.
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+## Процесс разработки
+
+- Спеки и план — до кода: `specify` → `clarify` → согласование контракта → `plan` →
+  `tasks` → `analyze` → `implement`.
+- Готовность: `sh scripts/check.sh --full` → `CHECK: PASS` и пройденные сценарии спек.
+- Решения по спорным местам и приёмку результата принимает человек.
+- Git: коммиты делает автор; соавторы-агенты в коммиты не добавляются.
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+Конституция важнее частных договорённостей в спеках и планах: план, нарушающий принцип,
+должен явно обосновать исключение в разделе проверки конституции или быть исправлен.
+Поправки вносятся через `/speckit-constitution` с записью версии: MAJOR — удаление или
+переопределение принципа, MINOR — новый принцип или раздел, PATCH — уточнение формулировок.
+Каждый план (`/speckit-plan`) и анализ (`/speckit-analyze`) сверяется с этой конституцией.
+Рабочие подробности — в `AGENTS.md` и `docs/style-guide.md`.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Version**: 1.0.0 | **Ratified**: 2026-10-19 | **Last Amended**: 2026-10-19
