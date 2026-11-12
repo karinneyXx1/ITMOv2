@@ -107,7 +107,7 @@ PR Trigger1 (pull_request, issue_comment)
 
 Модель тоже входит в ключ, поэтому `/make_ai_review` и `/make_other_ai_review` не блокируют друг друга: каждая модель ревьюит каждый коммит один раз.
 
-### 4. ⭐ Точечные комментарии к строкам diff (версия `ДЗ 4: точечные комментарии`)
+### 4. Точечные комментарии к строкам diff (версия `ДЗ 4: точечные комментарии`)
 
 Код нод лежит в [n8n/split_diff.js](n8n/split_diff.js) и [n8n/build_review.js](n8n/build_review.js), промпт агента — в [n8n/agent_prompt.txt](n8n/agent_prompt.txt).
 
@@ -131,7 +131,17 @@ PR Trigger1 (pull_request, issue_comment)
 3. **Build review** разбирает JSON (убирает обёртку ```` ```json ````, если она есть) и сверяет каждую пару `path + line` с `valid`. Комментарий к строке не из diff GitHub бы отклонил вместе со всем ревью, поэтому такие замечания переносятся в общий текст. Затем нода собирает тело запроса: `commit_id` = SHA, `event: "COMMENT"`, `comments: [{path, line, side: "RIGHT", body}]`.
 4. **Post review** отправляет `POST /repos/{owner}/{repo}/pulls/{n}/reviews`. Получается одно ревью: резюме сверху, замечания у строк кода.
 
-Результат: модель вернула 7 замечаний, все 7 привязались к строкам (`inline_count: 7`, `skipped_count: 0`).
+Результат: модель вернула 7 замечаний, все 7 привязались к строкам (`inline_count: 7`, `skipped_count: 0`). Комментарий получил каждый из трёх блоков изменений в PR (данные GitHub API `GET /pulls/2/comments`, коммит `5acaab3`):
+
+| Блок diff | Строка | Замечание |
+|---|---:|---|
+| `shop/cart.py` `@@ +21,6 @@` | 25 | `remove` молча игнорирует отсутствующий элемент |
+| `shop/discounts.py` `@@ +1,34 @@` | 6 | mutable default `used_codes=[]` |
+| | 10 | `eval()` — выполнение произвольного кода |
+| | 18 | O(n²) во вложенном цикле `bulk_discount` |
+| | 32 | недостижимая ветка `"platinum"` |
+| `shop/users.py` `@@ +6,11 @@` | 12 | SQL-инъекция через f-строку |
+| | 15 | голый `except` |
 
 | Запуск, вывод Build review | Комментарии у строк в PR |
 |---|---|
