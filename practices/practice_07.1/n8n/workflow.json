@@ -252,7 +252,8 @@
           "value": {
             "pr_number": "={{ $('Get PR meta').first().json.number }}\n",
             "head_sha": "={{ $('Get PR meta').first().json.head.sha }}",
-            "model": "={{ ($('PR Trigger1').first().json.body.comment?.body || '').includes('/make_other_ai_review') ? 'anthropic/claude-sonnet-4.6' : 'openai/gpt-5.2' }}"
+            "model": "={{ ($('PR Trigger1').first().json.body.comment?.body || '').includes('/make_other_ai_review') ? 'anthropic/claude-sonnet-4.6' : 'openai/gpt-5.2' }}",
+            "pr_id": "={{ $('Get PR meta').first().json.id }}\n"
           },
           "matchingColumns": [],
           "schema": [
@@ -285,6 +286,16 @@
               "type": "string",
               "readOnly": false,
               "removed": false
+            },
+            {
+              "id": "pr_id",
+              "displayName": "pr_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
             }
           ],
           "attemptToConvertTypes": false,
@@ -315,8 +326,8 @@
         "filters": {
           "conditions": [
             {
-              "keyName": "pr_number",
-              "keyValue": "={{ $json.number }}"
+              "keyName": "pr_id",
+              "keyValue": "={{ $json.id }}\n"
             },
             {
               "keyName": "head_sha",
@@ -529,7 +540,7 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "802ec5cf-b834-41a2-97c4-17119c33a488",
+  "versionId": "ee521c7a-15c5-4109-82d1-3a9f09d27538",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "68dbbb4e8fa686c3fd4e9982ade6836edb66976f207553e7ac22df961581c78c"

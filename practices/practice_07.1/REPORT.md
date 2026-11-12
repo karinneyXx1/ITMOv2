@@ -13,7 +13,7 @@
 PR Trigger1 (pull_request, issue_comment)
   → If (opened ИЛИ /make_ai_review ИЛИ /make_other_ai_review)
   → Get PR meta (GET /pulls/{n}, JSON: номер PR и SHA последнего коммита)
-  → Not reviewed yet? (Data Table: нет строки pr_number + head_sha + model)
+  → Not reviewed yet? (Data Table: нет строки pr_id + head_sha + model)
   → Get file's PR info (тот же PR в формате diff)
   → Split diff (Code: разбивает diff на блоки и нумерует строки)
   → Code Review Agent1 + OpenAI Chat Model1 (модель выбирается по команде)
@@ -75,10 +75,12 @@ PR Trigger1 (pull_request, issue_comment)
 
 ### 2. Data Table: сохраняем PR после ревью (версия `ДЗ 2: Data Table`)
 
-Таблица `reviewed_prs`: `pr_number` (Number), `head_sha` (String), `model` (String), плюс служебные `id`, `createdAt`, `updatedAt`.
+Таблица `reviewed_prs`: `pr_id` (Number, внутренний id PR в GitHub), `pr_number` (Number, номер PR в репозитории), `head_sha` (String), `model` (String), плюс служебные `id`, `createdAt`, `updatedAt`.
 
-- **Get PR meta** запрашивает PR с `Accept: application/vnd.github+json` и получает `number` и `head.sha`.
-- **Save reviewed PR** (Data Table → Insert) в конце цепочки записывает номер PR, SHA и модель.
+- **Get PR meta** запрашивает PR с `Accept: application/vnd.github+json` и получает `id`, `number` и `head.sha`.
+- **Save reviewed PR** (Data Table → Insert) в конце цепочки записывает id PR, номер PR, SHA и модель.
+
+Колонка `pr_id` добавлена позже (версия `ДЗ 2–3: pr_id`), поэтому в строках 1–4 она пустая. На первых скриншотах ниже её ещё нет.
 
 | Запуск с записью в таблицу | Таблица после первого ревью |
 |---|---|
@@ -87,7 +89,7 @@ PR Trigger1 (pull_request, issue_comment)
 ### 3. Повторный `/make_ai_review` не запускает ревью (версия `ДЗ 3: без повторов`)
 
 После Get PR meta стоит нода **Not reviewed yet?** (Data Table → If Row Does Not Exist). Её условия, все должны выполниться:
-`pr_number = {{ $json.number }}`, `head_sha = {{ $json.head.sha }}`, `model = <формула модели>`.
+`pr_id = {{ $json.id }}`, `head_sha = {{ $json.head.sha }}`, `model = <формула модели>`. До версии `ДЗ 2–3: pr_id` первым условием было `pr_number = {{ $json.number }}`.
 
 Если строка есть, нода ничего не передаёт дальше: запуск заканчивается за ~0,8 с, модель не вызывается.
 
@@ -106,6 +108,12 @@ PR Trigger1 (pull_request, issue_comment)
 | ![](screenshots/13a_bonus_new_commit_pr_review.png) | ![](screenshots/13b_bonus_new_commit_datatable.png) |
 
 Модель тоже входит в ключ, поэтому `/make_ai_review` и `/make_other_ai_review` не блокируют друг друга: каждая модель ревьюит каждый коммит один раз.
+
+**Проверка по `pr_id` (версия `ДЗ 2–3: pr_id`).** После коммита `dd49eb1` (исправление SQL-инъекции) `/make_ai_review` сделал ревью и записал строку с `pr_id = 5266025615`. Повторный `/make_ai_review` остановился на `Not reviewed yet?` за 747 мс.
+
+| Строка с `pr_id` | Повторный запуск остановлен |
+|---|---|
+| ![](screenshots/17_pr_id_datatable.png) | ![](screenshots/18_pr_id_repeat_stopped.png) |
 
 ### 4. Точечные комментарии к строкам diff (версия `ДЗ 4: точечные комментарии`)
 
