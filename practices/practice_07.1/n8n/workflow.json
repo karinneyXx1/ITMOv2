@@ -107,10 +107,8 @@
         },
         "repository": {
           "__rl": true,
-          "value": "ai-review-sandbox",
-          "mode": "list",
-          "cachedResultName": "ai-review-sandbox",
-          "cachedResultUrl": "https://github.com/karinneyXx1/ai-review-sandbox"
+          "value": "={{ $('PR Trigger1').first().json.body.repository.name }}\n",
+          "mode": "name"
         },
         "issueNumber": "={{ $('PR Trigger1').first().json.body.number || $('PR Trigger1').first().json.body.issue.number }}",
         "editFields": {
@@ -540,7 +538,7 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "ee521c7a-15c5-4109-82d1-3a9f09d27538",
+  "versionId": "d6bab38f-34cd-44e0-bbbd-029838b31299",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "68dbbb4e8fa686c3fd4e9982ade6836edb66976f207553e7ac22df961581c78c"
