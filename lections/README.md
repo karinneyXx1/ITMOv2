@@ -13,7 +13,7 @@
 | Лекция 5: Spec-driven разработка с AI-агентами |[Ссылка](https://avito.ktalk.ru/recordings/h97Hp1y7ZAodGoCIRLC3) |
 | Лекция 6: AI-evaluation: бенчмарки |[Ссылка](https://avito.ktalk.ru/recordings/JJRMcw6UvkCvVQHLgpqD) |
 | Лекция 7: Организация код-ревью с помощью N8N и поддержка пользователя с помощью AI инструментов |Очно |
-| Лекция + Практика 8: Дизайн на фронтенде | |
+| Лекция + Практика 8: Дизайн на фронтенде |[Ссылка](https://avito.ktalk.ru/recordings/BA3nowru0dVoFZnaulOr) |
 
 ## Практики
 
