@@ -3,6 +3,7 @@
 - **Сценарий:** `AI Code Review` на `https://n8n-itmo.cyrweb.ru`, экспорт в [n8n/workflow.json](n8n/workflow.json)
 - **Тестовый репозиторий:** https://github.com/karinneyXx1/ai-review-sandbox
 - **Тестовый PR:** https://github.com/karinneyXx1/ai-review-sandbox/pull/2 (`feature/discounts` → `main`)
+- **Основной проект:** https://github.com/karinneyXx1/tutor-hub, PR https://github.com/karinneyXx1/tutor-hub/pull/1, сценарий `AI Code Review — tutor-hub`, экспорт в [n8n/workflow_tutor_hub.json](n8n/workflow_tutor_hub.json) (см. раздел [«Внедрение в проект tutor-hub»](#внедрение-в-проект-tutor-hub))
 - **Модели:** `openai/gpt-5.2` (основная), `anthropic/claude-sonnet-4.6` (вторая), обе через LiteLLM-прокси курса
 
 ## Итоговая схема
@@ -154,6 +155,29 @@ PR Trigger1 (pull_request, issue_comment)
 | Запуск, вывод Build review | Комментарии у строк в PR |
 |---|---|
 | ![](screenshots/14_hw4_execution_build_review.png) | ![](screenshots/15_hw4_pr_inline_comments.png) |
+
+## Внедрение в проект tutor-hub
+
+Сценарий отлаживался на тестовом репозитории с намеренно подложенными ошибками, после чего был подключён к основному проекту курса.
+
+**Проект:** [tutor-hub](https://github.com/karinneyXx1/tutor-hub) («Код-репетитор») — сервис, где репетитор выдаёт ученикам домашние задания и ставит уроки в расписание, а ученики сдают ДЗ и получают оценку. Сервер на Python (FastAPI + SQLite), тесты pytest запускаются в GitHub Actions на каждый PR.
+
+**Как переносили:**
+1. Сценарий продублирован в `AI Code Review — tutor-hub`, в PR Trigger1 указан репозиторий `tutor-hub`. Модели, промпт, Split diff, Build review и Data Table `reviewed_prs` общие для обоих сценариев.
+2. При первом запуске ревью появилось в PR, а метка `ReviewedByAI` — нет. Причина: в ноде Add Label to PR1 репозиторий был задан вручную (`ai-review-sandbox`), и копия ставила метку в тестовый репозиторий. Ревью при этом попадало куда нужно, потому что Post review берёт адрес PR из ответа GitHub. Исправление: репозиторий в Add Label to PR1 берётся из события, `{{ $('PR Trigger1').first().json.body.repository.name }}`.
+3. Одна Data Table на два репозитория не путает PR с одинаковыми номерами: проверка повторов идёт по `pr_id` (внутренний id PR в GitHub, уникальный для всего GitHub), а не по номеру.
+
+**Результат на PR #1 «Add student progress endpoint»** (новый эндпоинт прогресса ученика, 6 тестов):
+
+| Открытие PR: ревью `openai/gpt-5.2`, комментарии у строк | После исправления появилась метка `ReviewedByAI` |
+|---|---|
+| ![](screenshots/20_tutor_hub_pr_opened_gpt.png) | ![](screenshots/21_tutor_hub_label_fixed.png) |
+
+| `/make_other_ai_review`: ревью `anthropic/claude-sonnet-4.6` | Запуск сценария `tutor-hub`, вся цепочка выполнена |
+|---|---|
+| ![](screenshots/22_tutor_hub_other_model_claude.png) | ![](screenshots/23_tutor_hub_execution.png) |
+
+На реальном коде обе модели нашли одни и те же содержательные замечания: `student["name"]` упадёт, если пользователь не найден, `counts[row["status"]]` упадёт на неизвестном статусе, тест `test_overdue` открывает отдельное соединение с базой. GPT дополнительно обратил внимание на блокирующие вызовы SQLite в обработчике FastAPI.
 
 ## Ограничения
 
