@@ -1,0 +1,170 @@
+{
+  "name": "Issue classifier (sub)",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "title"
+            },
+            {
+              "name": "body"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "id": "caf518c1-0c86-4ab3-95a5-61c6f01109aa",
+      "name": "When called by WF1",
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Classify this GitHub Issue for the project \"Код-репетитор\" — a web service where a tutor assigns homework and schedules lessons, and students submit homework.\n\nTitle: {{ $json.title }}\nBody: {{ $json.body }}\n\nTypes:\n- bug: something works incorrectly (error, wrong behavior, crash)\n- task: a question about existing functionality, how to do something\n- feature: a request for a new capability\n- unknown: the author reports a problem or need related to the service, but it is too vague to tell what exactly is wrong or wanted\n- spam: clearly NOT about the service — advertising, random characters, greetings without any request\n\nImportant: if the text complains that something \"doesn't work\", \"is broken\", \"is wrong\" — even without details — it is about the service, so it is unknown (or bug if details are given), NEVER spam. Use spam only when there is no relation to the service at all.\n\nExamples:\n- \"Не сохраняется оценка за ДЗ: ставлю 5, нажимаю «Проверено», оценки нет\" → bug, 0.95\n- \"Как репетитору вернуть ДЗ на доработку?\" → task, 0.9\n- \"Добавьте напоминание об уроке за час\" → feature, 0.9\n- \"Иногда не работает. что-то не так\" → unknown, 0.3\n- \"Привет! asdfgh купите курсы недорого\" → spam, 0.95\n\nconfidence: a number from 0 to 1 showing how sure you are. If the description is short or vague, confidence must be low.",
+        "hasOutputParser": true,
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        224,
+        0
+      ],
+      "id": "a3911d1e-bf58-4109-92f3-6a2df320891c",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "openai/gpt-5.2",
+          "mode": "id"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        160,
+        224
+      ],
+      "id": "77d001bf-4fa7-4c97-9af6-27b870851c9b",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "uQ4VTksTv67ENdXX",
+          "name": "OpenAI account 20"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"type\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"bug\",\n        \"task\",\n        \"feature\",\n        \"spam\",\n        \"unknown\"\n      ]\n    },\n    \"confidence\": {\n      \"type\": \"number\",\n      \"minimum\": 0,\n      \"maximum\": 1\n    }\n  },\n  \"required\": [\n    \"type\",\n    \"confidence\"\n  ]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        352,
+        224
+      ],
+      "id": "68acb0a7-ab04-4ec3-9791-b79d6f8932f0",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6e58e355-89d2-429a-8c03-1a6a450f1a97",
+              "name": "type",
+              "value": "={{ $json.output.type }}",
+              "type": "string"
+            },
+            {
+              "id": "631965dd-84e9-4c1c-bb0a-b26189d0592c",
+              "name": "confidence",
+              "value": "={{ $json.output.confidence }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "id": "bd1fe178-042d-4bee-945c-c22d9ebc7ac2",
+      "name": "Return type and confidence",
+      "position": [
+        576,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When called by WF1": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Return type and confidence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "b368eaa0-61e6-4bb4-857c-025d8ae37f79",
+  "meta": {
+    "instanceId": "68dbbb4e8fa686c3fd4e9982ade6836edb66976f207553e7ac22df961581c78c"
+  },
+  "nodeGroups": [],
+  "id": "lyU5PB1J1VJJY6wb",
+  "tags": []
+}
