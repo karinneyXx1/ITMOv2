@@ -9,6 +9,7 @@
 | WF1 Issues triage | [n8n/wf1_issues_triage.json](n8n/wf1_issues_triage.json) |
 | Issue classifier (sub) | [n8n/issue_classifier_sub.json](n8n/issue_classifier_sub.json) |
 | WF Weekly stats | [n8n/weekly_stats.json](n8n/weekly_stats.json) (адрес получателя заменён на заглушку) |
+| WF Auto-fix bugs (сверхрезультат) | [n8n/wf_autofix_bugs.json](n8n/wf_autofix_bugs.json) |
 
 Код Code-нод сценария статистики дополнительно вынесен в [n8n/code/](n8n/code/).
 
@@ -140,3 +141,50 @@ Every Monday 9:00 (cron 0 9 * * MON, Europe/Moscow)
 Basic LLM Chain `AI comment` получает текущие значения, значения прошлой недели, Δ и разбивку по авторам. Он пишет 3–4 предложения: что изменилось, что тревожно, на что обратить внимание. Если истории нет, сообщает, что сравнение появится со следующего отчёта (первое письмо).
 
 ![](screenshots/42_email_week2_delta.png)
+
+## Сверхрезультат: от баг-репорта до merge в main
+
+Сценарий `WF Auto-fix bugs` получает Issue с меткой `bug`, сам исправляет код, открывает PR, дожидается тестов, проводит AI-ревью и, если серьёзных замечаний нет, мержит исправление в `main`.
+
+```
+Github Trigger (issues)
+  → Bug from trusted author?   action = labeled, метка bug, автор OWNER / MEMBER / COLLABORATOR
+  → Get repo tree → Pick source files → Read file → Build context   код сервера, тесты, AGENTS.md
+  → Write fix (Basic LLM Chain + Structured Output Parser)          { summary, files: [{ path, content }] }
+  → Get main → Create branch fix/issue-N
+  → Prepare commit → Commit file (PUT /contents, по одному файлу)
+  → Open PR «Fix #N» (Closes #N) → комментарий в Issue
+  → Wait for CI (30 с) → Get checks → CI status → CI finished?       цикл, до 12 попыток
+  → Get PR diff → Review fix (Basic LLM Chain)                       { verdict, serious_issues, summary }
+  → Post review → Safe to merge?
+       ├ CI = success И verdict = approve → Merge PR (squash) → комментарий в Issue
+       └ иначе → комментарий «нужна проверка человеком» + метка needs-human
+```
+
+Метку `bug` ставит WF1, поэтому вся цепочка запускается от одного действия пользователя — создания Issue.
+
+**Защитные меры:**
+- автоисправление запускается только для Issues владельца и соавторов (`author_association`), чтобы посторонний не мог через «баг-репорт» внедрить код (prompt injection);
+- в промпте текст баг-репорта и diff явно помечены как данные, а не инструкции;
+- `Prepare commit` разрешает менять только файлы, которые были в контексте, или добавлять `backend/tests/test_*.py`; `.github/workflows` и прочие файлы изменить нельзя;
+- merge выполняется, только если тесты в GitHub Actions прошли **и** ревью вернуло `approve`.
+
+Код Code-нод: [autofix_pick_files.js](n8n/code/autofix_pick_files.js), [autofix_build_context.js](n8n/code/autofix_build_context.js), [autofix_prepare_commit.js](n8n/code/autofix_prepare_commit.js), [autofix_ci_status.js](n8n/code/autofix_ci_status.js).
+
+### Проверка
+
+Для проверки в `main` был специально внесён баг (коммит `d9a45aa`): проверка статуса при сдаче ДЗ ослаблена, и ученик мог заново сдать уже проверенное ДЗ, затерев оценку. Тест, ловивший это, удалён, поэтому CI оставался зелёным.
+
+1. Создан [Issue #14](https://github.com/karinneyXx1/tutor-hub/issues/14) «Ученик может пересдать уже проверенное ДЗ»; WF1 поставил метку `bug`.
+2. Сценарий открыл [PR #15](https://github.com/karinneyXx1/tutor-hub/pull/15) из ветки `fix/issue-14`: модель восстановила проверку `if row["status"] not in ("assigned", "returned")` и добавила тест `test_cannot_resubmit_checked_homework`.
+3. Тесты в GitHub Actions прошли, AI-ревью вернуло `approve`, PR смержен squash-коммитом `2651f04`, Issue #14 закрыт автоматически по `Closes #14`. Весь путь занял около минуты.
+
+PR дополнительно получил ревью от сценария практики 7.1, который подключён к этому репозиторию.
+
+| Запуск сценария | Issue #14: комментарии бота и закрытие |
+|---|---|
+| ![](screenshots/50_autofix_run.png) | ![](screenshots/53_autofix_issue_closed.png) |
+
+| PR #15: описание, ревью, merge | PR #15: исправление и новый тест |
+|---|---|
+| ![](screenshots/51_autofix_pr_conversation.png) | ![](screenshots/52_autofix_pr_files.png) |
